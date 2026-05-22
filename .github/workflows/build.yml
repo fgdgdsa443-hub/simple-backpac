@@ -1,264 +1,41 @@
-cat > gradle.properties <<'EOF'
-      org.gradle.jvmargs=-Xmx2G
-      minecraft_version=1.21.4
-      yarn_mappings=1.21.4+build.8
-      loader_version=0.16.10
-      mod_version=1.0.0
-      maven_group=ru.nix.tolyanvisuals
-      archives_base_name=TolyanVisuals-1.21.4
-      EOF
+name: Build Tolyan Visuals
 
-      cat > build.gradle <<'EOF'
-      plugins {
-          id 'fabric-loom' version '1.9-SNAPSHOT'
-      }
-      version = project.mod_version
-      group = project.maven_group
-      base { archivesName = project.archives_base_name }
-      repositories {
-          maven { url = "https://maven.fabricmc.net/" }
-          mavenCentral()
-      }
-      dependencies {
-          minecraft "com.mojang:minecraft:${project.minecraft_version}"
-          mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-          modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-          modImplementation "net.fabricmc.fabric-api:fabric-api:0.114.0+1.21.4"
-      }
-      processResources {
-          inputs.property "version", project.version
-          filesMatching("fabric.mod.json") { expand "version": project.version }
-      }
-      tasks.withType(JavaCompile).configureEach { options.release = 21 }
-      java {
-          sourceCompatibility = JavaVersion.VERSION_21
-          targetCompatibility = JavaVersion.VERSION_21
-      }
-      EOF
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
 
-      cat > src/main/resources/fabric.mod.json <<'EOF'
-      {
-        "schemaVersion": 1,
-        "id": "tolyanvisuals",
-        "version": "${version}",
-        "name": "Tolyan Visuals",
-        "description": "Premium Visual Client for Minecraft 1.21.4",
-        "authors": ["Nix"],
-        "contact": {},
-        "license": "MIT",
-        "icon": "assets/tolyanvisuals/icon.png",
-        "environment": "client",
-        "entrypoints": {
-          "client": [
-            "ru.nix.tolyanvisuals.TolyanVisuals"
-          ]
-        },
-        "depends": {
-          "fabricloader": ">=0.16.10",
-          "minecraft": "1.21.4",
-          "java": ">=21",
-          "fabric-api": "*"
-        }
-      }
-      EOF
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      cat > src/main/java/ru/nix/tolyanvisuals/TolyanVisuals.java <<'EOF'
-      package ru.nix.tolyanvisuals;
+      - name: Create project files (Base64 Safe Mode)
+        run: |
+          echo "bWtkaXIgLXAgc3JjL21haW4vamF2YS9ydS9uaXgvdG9seWFudmlzdWFscy9tb2R1bGUvaHVkCm1rZGlyIC1wIHNyYy9tYWluL2phdmEvcnUvbml4L3RvbHlhbnZpc3VhbHMvdXRpbHMKbWtkaXIgLXAgc3JjL21haW4vcmVzb3VyY2VzL2Fzc2V0cy90b2x5YW52aXN1YWxzL2xhbmcKbWtkaXIgLXAgc3JjL21haW4vcmVzb3VyY2VzL2Fzc2V0cy90b2x5YW52aXN1YWxzCgpjYXQgPiBzZXR0aW5ncy5ncmFkbGUgPDwnRU9GJwpwbHVnaW5NYW5hZ2VtZW50IHsKICAgIHJlcG9zaXRvcmllcyB7CiAgICAgICAgbWF2ZW4geyB1cmwgPSAiaHR0cHM6Ly9tYXZlbi5mYWJyaWNtYy5uZXQvIiB9CiAgICAgICAgZ3JhZGxlUGx1Z2luUG9ydGFsKCkKICAgICAgICBtYXZlbkNlbnRyYWwoKQogICAgfQp9CkVPRgoKY2F0ID4gZ3JhZGxlLnByb3BlcnRpZXMgPDwnRU9GJwpvcmcuZ3JhZGxlLmp2bWFyZ3M9LVhteDJHCm1pbmVjcmFmdF92ZXJzaW9uPTEuMjEuNAp5YXJuX21hcHBpbmdzPTEuMjEuNCtidWlsZC44CmxvYWRlcl92ZXJzaW9uPTAuMTYuMTAKbW9kX3ZlcnNpb249MS4wLjAKbWF2ZW5fZ3JvdXA9cnUubml4LnRvbHlhbnZpc3VhbHMKYXJjaGl2ZXNfYmFzZV9uYW1lPVRvbHlhblZpc3VhbHMtMS4yMS40CkVPRgoKY2F0ID4gYnVpbGQuZ3JhZGxlIDw8J0VPRicKcGx1Z2lucyB7CiAgICBpZCAnZmFicmljLWxvb20nIHZlcnNpb24gJzEuOS1TTkFQU0hPVCcKfQp2ZXJzaW9uID0gcHJvamVjdC5tb2RfdmVyc2lvbgpncm91cCA9IHByb2plY3QubWF2ZW5fZ3JvdXAKYmFzZSB7IGFyY2hpdmVzTmFtZSA9IHByb2plY3QuYXJjaGl2ZXNfYmFzZV9uYW1lIH0KcmVwb3NpdG9yaWVzIHsKICAgIG1hdmVuIHsgdXJsID0gImh0dHBzOi8vbWF2ZW4uZmFicmljbWMubmV0LyIgfQogICAgbWF2ZW5DZW50cmFsKCkKfQpkZXBlbmRlbmNpZXMgewogICAgbWluZWNyYWZ0ICJjb20ubW9qYW5nOm1pbmVjcmFmdDoke3Byb2plY3QubWluZWNyYWZ0X3ZlcnNpb259IgogICAgbWFwcGluZ3MgIm5ldC5mYWJyaWNtYzp5YXJuOiR7cHJvamVjdC55YXJuX21hcHBpbmdzfTp2MiIKICAgIG1vZEltcGxlbWVudGF0aW9uICJuZXQuZmFicmljbWM6ZmFicmljLWxvYWRlcjoke3Byb2plY3QubG9hZGVyX3ZlcnNpb259IgogICAgbW9kSW1wbGVtZW50YXRpb24gIm5ldC5mYWJyaWNtYy5mYWJyaWMtYXBpOmZhYnJpYy1hcGk6MC4xMTQuMCsxLjIxLjQiCn0KcHJvY2Vzc1Jlc291cmNlcyB7CiAgICBpbnB1dHMucHJvcGVydHkgInZlcnNpb24iLCBwcm9qZWN0LnZlcnNpb24KICAgIGZpbGVzTWF0Y2hpbmcoImZhYnJpYy5tb2QuanNvbiIpIHsgZXhwYW5kICJ2ZXJzaW9uIjogcHJvamVjdC52ZXJzaW9uIH0KfQp0YXNrcy53aXRoVHlwZShKYXZhQ29tcGlsZSkuY29uZmlndXJlRWFjaCB7IG9wdGlvbnMucmVsZWFzZSA9IDIxIH0KamF2YSB7CiAgICBzb3VyY2VDb21wYXRpYmlsaXR5ID0gSmF2YVZlcnNpb24uVkVSU0lPTl8yMQogICAgdGFyZ2V0Q29tcGF0aWJpbGl0eSA9IEphdmFWZXJzaW9uLkdFUlNJT05fMjEKfQpFT0YKCmNhdCA+IHNyYy9tYWluL3Jlc291cmNlcy9mYWJyaWMubW9kLmpzb24gPDwnRU9GJwp7CiAgInNjaGVtYVZlcnNpb24iOiAxLAogICJpZCI6ICJ0b2x5YW52aXN1YWxzIiwKICAidmVyc2lvbiI6ICIke3ZlcnNpb259IiwKICAibmFtZSI6ICJUb2x5YW4gVmlzdWFscyIsCiAgImRlc2NyaXB0aW9uIjogIlByZW1pdW0gVmlzdWFsIENsaWVudCBmb3IgTWluZWNyYWZ0IDEuMjEuNCIsCiAgImF1dGhvcnMiOiBbIk5peCJdLAogICJjb250YWN0Ijoge30sCiAgImxpY2Vuc2UiOiAiTUlUIiwKICAiaWNvbiI6ICJhc3NldHMvdG9seWFudmlzdWFscy9pY29uLnBuZyIsCiAgImVudmlyb25tZW50IjogImNsaWVudCIsCiAgImVudHJ5cG9pbnRzIjogewogICAgImNsaWVudCI6IFsKICAgICAgInJ1Lm5peC50b2x5YW52aXN1YWxzLlRvbHlhblZpc3VhbHMiCiAgICBdCiAgfSwKICAiZGVwZW5kcyI6IHsKICAgICJmYWJyaWNsb2FkZXIiOiAiPj0wLjE2LjEwIiwKICAgICJtaW5lY3JhZnQiOiAiMS4yMS40IiwKICAgICJqYXZhIjogIj49MjEiLAogICAgImZhYnJpYy1hcGkiOiAiKiIKICB9Cn0KRU9GCgpjYXQgPiBzcmMvbWFpbi9qYXZhL3J1L25peC90b2x5YW52aXN1YWxzL1RvbHlhblZpc3VhbHMuamF2YSA8PCdFT0YnCnBhY2thZ2UgcnUubml4LnRvbHlhbnZpc3VhbHM7CgppbXBvcnQgbmV0LmZhYnJpY21jLmFwaS5DbGllbnRNb2RJbml0aWFsaXplcjsKaW1wb3J0IG5ldC5mYWJyaWNtYy5mYWJyaWMuYXBpLmNsaWVudC5yZW5kZXJpbmcudjEuSHVkUmVuZGVyQ2FsbGJhY2s7CmltcG9ydCBydS5uaXgudG9seWFudmlzdWFscy5tb2R1bGUuTW9kdWxlTWFuYWdlcjsKaW1wb3J0IHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZS5Nb2R1bGU7CmltcG9ydCBvcmcuc2xmNGouTG9nZ2VyOwppbXBvcnQgb3JnLnNsZjRqLkxvZ2dlckZhY3Rvcnk7CgpwdWJsaWMgY2xhc3MgVG9seWFuVmlzdWFscyBpbXBsZW1lbnRzIENsaWVudE1vZEluaXRpYWxpemVyIHsKICAgIHB1YmxpYyBzdGF0aWMgZmluYWwgU3RyaW5nIE1PRF9JRCA9ICJ0b2x5YW52aXN1YWxzIjsKICAgIHB1YmxpYyBzdGF0aWMgZmluYWwgU3RyaW5nIENMSUVOVF9OQU1FID0gIlRvbHlhbiBWaXN1YWxzIjsKICAgIHB1YmxpYyBzdGF0aWMgZmluYWwgTG9nZ2VyIExPR0dFUiA9IExvZ2dlckZhY3RvcnkuZ2V0TG9nZ2VyKENMSUVOVF9OQU1FKTsKCiAgICBwdWJsaWMgc3RhdGljIE1vZHVsZU1hbmFnZXIgbW9kdWxlTWFuYWdlcjsKCiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIG9uSW5pdGlhbGl6ZUNsaWVudCgpIHsKICAgICAgICBMT0dHRVIuaW5mbygiSW5pdGlhbGl6aW5nIHt9IFByZW1pdW0gVUkuLi4iLCBDTElFTlRfTkFNRSk7CiAgICAgICAgbW9kdWxlTWFuYWdlciA9IG5ldyBNb2R1bGVNYW5hZ2VyKCk7CiAgICAgICAgSHVkUmVuZGVyQ2FsbGJhY2suRVZFTlQucmVnaXN0ZXIoKGRyYXdDb250ZXh0LCB0aWNrRGVsdGEpIC0+IHsKICAgICAgICAgICAgZm9yIChNb2R1bGUgbW9kdWxlIDogbW9kdWxlTWFuYWdlci5nZXRNb2R1bGVzKCkpIHsKICAgICAgICAgICAgICAgIGlmIChtb2R1bGUuaXNUb2dnbGVkKCkpIHsKICAgICAgICAgICAgICAgICAgICBtb2R1bGUub25SZW5kZXIoZHJhd0NvbnRleHQsIHRpY2tEZWx0YSk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9KTsKICAgIH0KfQpFT0YKCmNhdCA+IHNyYy9tYWluL2phdmEvcnUvbml4L3RvbHlhbnZpc3VhbHMvbW9kdWxlL0NhdGVnb3J5LmphdmEgPDwnRU9GJwpwYWNrYWdlIHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZTsKcHVibGljIGVudW0gQ2F0ZWdvcnkgewogICAgVklTVUFMKCJWaXN1YWwiKSwKICAgIEhVRCgiSFVEIiksCiAgICBJTlRFUkZBQ0UoIkludGVyZmFjZSIpLAogICAgUkVOREVSKCJSZW5kZXIiKSwKICAgIFNFVFRJTkdTKCJTZXR0aW5ncyIpLAogICAgQ09TTUVUSUNTKCJDb3NtZXRpY3MiKTsKICAgIHB1YmxpYyBmaW5hbCBTdHJpbmcgbmFtZTsKICAgIENhdGVnb3J5KFN0cmluZyBuYW1lKSB7CiAgICAgICAgdGhpcy5uYW1lID0gbmFtZTsKICAgIH0KfQpFT0YKCmNhdCA+IHNyYy9tYWluL2phdmEvcnUvbml4L3RvbHlhbnZpc3VhbHMvbW9kdWxlL01vZHVsZS5qYXZhIDw8J0VPRicKcGFja2FnZSBydS5uaXgudG9seWFudmlzdWFscy5tb2R1bGU7CmltcG9ydCBuZXQubWluZWNyYWZ0LmNsaWVudC5NaW5lY3JhZnRDbGllbnQ7CmltcG9ydCBuZXQubWluZWNyYWZ0LmNsaWVudC5ndWkuRHJhd0NvbnRleHQ7CnB1YmxpYyBjbGFzcyBNb2R1bGUgewogICAgcHJpdmF0ZSBmaW5hbCBTdHJpbmcgbmFtZTsKICAgIHByaXZhdGUgZmluYWwgQ2F0ZWdvcnkgY2F0ZWdvcnk7CiAgICBwcml2YXRlIGJvb2xlYW4gdG9nZ2xlZDsKICAgIHByb3RlY3RlZCBmaW5hbCBNaW5lY3JhZnRDbGllbnQgbWMgPSBNaW5lY3JhZnRDbGllbnQuZ2V0SW5zdGFuY2UoKTsKICAgIHB1YmxpYyBNb2R1bGUoU3RyaW5nIG5hbWUsIENhdGVnb3J5IGNhdGVnb3J5KSB7CiAgICAgICAgdGhpcy5uYW1lID0gbmFtZTsKICAgICAgICB0aGlzLmNhdGVnb3J5ID0gY2F0ZWdvcnk7CiAgICAgICAgdGhpcy50b2dnbGVkID0gZmFsc2U7CiAgICB9CiAgICBwdWJsaWMgdm9pZCB0b2dnbGUoKSB7CiAgICAgICAgdGhpcy50b2dnbGVkID0gIXRoaXMudG9nZ2xlZDsKICAgICAgICBpZiAodG9nZ2xlZCkgb25FbmFibGUoKTsKICAgICAgICBlbHNlIG9uRGlzYWJsZSgpOwogICAgfQogICAgcHVibGljIHZvaWQgb25FbmFibGUoKSB7fQogICAgcHVibGljIHZvaWQgb25EaXNhYmxlKCkge30KICAgIHB1YmxpYyB2b2lkIG9uUmVuZGVyKERyYXdDb250ZXh0IGNvbnRleHQsIGZsb2F0IHRpY2tEZWx0YSkge30KICAgIHB1YmxpYyBTdHJpbmcgZ2V0TmFtZSgpIHsgcmV0dXJuIG5hbWU7IH0KICAgIHB1YmxpYyBDYXRlZ29yeSBnZXRDYXRlZ29yeSgpIHsgcmV0dXJuIGNhdGVnb3J5OyB9CiAgICBwdWJsaWMgYm9vbGVhbiBpc1RvZ2dsZWQoKSB7IHJldHVybiB0b2dnbGVkOyB9CiAgICBwdWJsaWMgdm9pZCBzZXRUb2dnbGVkKGJvb2xlYW4gdG9nZ2xlZCkgeyB0aGlzLnRvZ2dsZWQgPSB0b2dnbGVkOyB9Cn0KRU9GCgpjYXQgPiBzcmMvbWFpbi9qYXZhL3J1L25peC90b2x5YW52aXN1YWxzL21vZHVsZS9Nb2R1bGVNYW5hZ2VyLmphdmEgPDwnRU9GJwpwYWNrYWdlIHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZTsKaW1wb3J0IHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZS5odWQuV2F0ZXJtYXJrOwppbXBvcnQgamF2YS51dGlsLkFycmF5TGlzdDsKaW1wb3J0IGphdmEudXRpbC5MaXN0OwpwdWJsaWMgY2xhc3MgTW9kdWxlTWFuYWdlciB7CiAgICBwcml2YXRlIGZpbmFsIExpc3Q8TW9kdWxlPiBtb2R1bGVzID0gbmV3IEFycmF5TGlzdDw+KCk7CiAgICBwdWJsaWMgTW9kdWxlTWFuYWdlcigpIHsKICAgICAgICBhZGRNb2R1bGUobmV3IFdhdGVybWFyaygpKTsKICAgIH0KICAgIHByaXZhdGUgdm9pZCBhZGRNb2R1bGUoTW9kdWxlIG1vZHVsZSkgewogICAgICAgIG1vZHVsZXMuYWRkKG1vZHVsZSk7CiAgICB9CiAgICBwdWJsaWMgTGlzdDxNb2R1bGU+IGdldE1vZHVsZXMoKSB7CiAgICAgICAgcmV0dXJuIG1vZHVsZXM7CiAgICB9Cn0KRU9GCgpjYXQgPiBzcmMvbWFpbi9qYXZhL3J1L25peC90b2x5YW52aXN1YWxzL3V0aWxzL0NvbG9yVXRpbHMuamF2YSA8PCdFT0YnCnBhY2thZ2UgcnUubml4LnRvbHlhbnZpc3VhbHMudXRpbHM7CnB1YmxpYyBjbGFzcyBDb2xvclV0aWxzIHsKICAgIHB1YmxpYyBzdGF0aWMgaW50IGdldEdyYWRpZW50KGludCBvZmZzZXQpIHsKICAgICAgICBkb3VibGUgc3BlZWQgPSAzMDAwLjA7CiAgICAgICAgZG91YmxlIHRpbWUgPSAoU3lzdGVtLmN1cnJlbnRUaW1lTWlsbGlzKCkgKyBvZmZzZXQpICUgc3BlZWQgLyBzcGVlZDsKICAgICAgICBpbnQgcjEgPSAxMzksIGcxID0gOTIsIGIxID0gMjQ2OwogICAgICAgIGludCByMiA9IDE2OCwgZzIgPSA4NSwgYjIgPSAyNDc7CiAgICAgICAgZG91YmxlIGZhY3RvciA9IChNYXRoLnNpbih0aW1lICogTWF0aC5QSSAqIDIpICsgMS4wKSAvIDIuMDsKICAgICAgICBpbnQByID0gKGludCkgKHIxICsgKHIyIC0gcjEpICogZmFjdG9yKTsKICAgICAgICBpbnQgZyA9IChpbnQpIChnMSArIChnMiAtIGcxKSAqIGZhY3Rvcik7CiAgICAgICAgaW50IGIgPSAoaW50KSAoYjEgKyAoYjIgLSBiMSkgKiBmYWN0b3IpOwogICAgICAgIHJldHVybiAoMjU1IDw8IDI0KSB8IChyIDw8IDE2KSB8IChnIDw8IDgpIHwgYjsKICAgIH0KfQpFT0YKCmNhdCA+IHNyYy9tYWluL2phdmEvcnUvbml4L3RvbHlhbnZpc3VhbHMvbW9kdWxlL2h1ZC9XYXRlcm1hcmsuamF2YSA8PCdFT0YnCnBhY2thZ2UgcnUubml4LnRvbHlhbnZpc3VhbHMubW9kdWxlLmh1ZDsKaW1wb3J0IG5ldC5taW5lY3JhZnQuY2xpZW50Lmd1aS5EcmF3Q29udGV4dDsKaW1wb3J0IHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZS5DYXRlZ29yeTsKaW1wb3J0IHJ1Lm5peC50b2x5YW52aXN1YWxzLm1vZHVsZS5Nb2R1bGU7CmltcG9ydCBydS5uaXgudG9seWFudmlzdWFscy51dGlscy5Db2xvclV0aWxzOwppbXBvcnQgcnUubml4LnRvbHlhbnZpc3VhbHMuVG9seWFuVmlzdWFsczsKcHVibGljIGNsYXNzIFdhdGVybWFyayBleHRlbmRzIE1vZHVsZSB7CiAgICBwdWJsaWMgV2F0ZXJtYXJrKCkgewogICAgICAgIHN1cGVyKCJXYXRlcm1hcmsiLCBDYXRlZ29yeS5IVUQpOwogICAgICAgIHNldFRvZ2dsZWQodHJ1ZSk7CiAgICB9CiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIG9uUmVuZGVyKERyYXdDb250ZXh0IGNvbnRleHQsIGZsb2F0IHRpY2tEZWx0YSkgewogICAgICAgIGlmIChtYy50ZXh0UmVuZGVyID09IG51bGwpIHJldHVybjsKICAgICAgICBTdHJpbmcgdGV4dCA9IFRvbHlhblZpc3VhbHMuQ0xJRU5UX05BTUUgKyAiIHwgMS4yMS40IHwgRlBTOiAiICsgbWMuZ2V0Q3VycmVudEZwcygpOwogICAgICAgIGludCB4ID0gNTsKICAgICAgICBpbnQgeSA9IDU7CiAgICAgICAgaW50IGN1cnJlbnRYID0geDsKICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8IHRleHQubGVuZ3RoKCk7IGkrKykgewogICAgICAgICAgICBTdHJpbmcgY2hhcmFjdGVyID0gU3RyaW5nLnZhbHVlT2YodGV4dC5jaGFyQXQoaSkpOwogICAgICAgICAgICBpbnQgY29sb3IgPSBDb2xvclV0aWxzLmdldEdyYWRpZW50KGkgKiAtMjApOwogICAgICAgICAgICBjb250ZXh0LmRyYXdUZXh0KG1jLnRleHRSZW5kZXIsIGNoYXJhY3RlciwgY3VycmVudFgsIHksIGNvbG9yLCB0cnVlKTsKICAgICAgICAgICAgY3VycmVudFggKz0gbWMudGV4dFJlbmRlci5nZXRXaWR0aChjaGFyYWN0ZXIpOwogICAgICAgIH0KICAgIH0KfQpFT0YK" | base64 -d > setup.sh
+          bash setup.sh
 
-      import net.fabricmc.api.ClientModInitializer;
-      import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-      import ru.nix.tolyanvisuals.module.ModuleManager;
-      import ru.nix.tolyanvisuals.module.Module;
-      import org.slf4j.Logger;
-      import org.slf4j.LoggerFactory;
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-      public class TolyanVisuals implements ClientModInitializer {
-          public static final String MOD_ID = "tolyanvisuals";
-          public static final String CLIENT_NAME = "Tolyan Visuals";
-          public static final Logger LOGGER = LoggerFactory.getLogger(CLIENT_NAME);
-          
-          public static ModuleManager moduleManager;
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.12.1
 
-          @Override
-          public void onInitializeClient() {
-              LOGGER.info("Initializing {} Premium UI...", CLIENT_NAME);
-              
-              moduleManager = new ModuleManager();
-              
-              // Хук в рендер HUD'а
-              HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
-                  for (Module module : moduleManager.getModules()) {
-                      if (module.isToggled()) {
-                          module.onRender(drawContext, tickDelta);
-                      }
-                  }
-              });
-          }
-      }
-      EOF
+      - name: Build jar
+        run: gradle build --no-daemon
 
-      cat > src/main/java/ru/nix/tolyanvisuals/module/Category.java <<'EOF'
-      package ru.nix.tolyanvisuals.module;
-
-      public enum Category {
-          VISUAL("Visual"),
-          HUD("HUD"),
-          INTERFACE("Interface"),
-          RENDER("Render"),
-          SETTINGS("Settings"),
-          COSMETICS("Cosmetics");
-
-          public final String name;
-
-          Category(String name) {
-              this.name = name;
-          }
-      }
-      EOF
-
-      cat > src/main/java/ru/nix/tolyanvisuals/module/Module.java <<'EOF'
-      package ru.nix.tolyanvisuals.module;
-
-      import net.minecraft.client.MinecraftClient;
-      import net.minecraft.client.gui.DrawContext;
-
-      public class Module {
-          private final String name;
-          private final Category category;
-          private boolean toggled;
-          protected final MinecraftClient mc = MinecraftClient.getInstance();
-
-          public Module(String name, Category category) {
-              this.name = name;
-              this.category = category;
-              this.toggled = false;
-          }
-
-          public void toggle() {
-              this.toggled = !this.toggled;
-              if (toggled) onEnable();
-              else onDisable();
-          }
-
-          public void onEnable() {}
-          public void onDisable() {}
-          
-          public void onRender(DrawContext context, float tickDelta) {}
-
-          public String getName() { return name; }
-          public Category getCategory() { return category; }
-          public boolean isToggled() { return toggled; }
-          public void setToggled(boolean toggled) { this.toggled = toggled; }
-      }
-      EOF
-
-      cat > src/main/java/ru/nix/tolyanvisuals/module/ModuleManager.java <<'EOF'
-      package ru.nix.tolyanvisuals.module;
-
-      import ru.nix.tolyanvisuals.module.hud.Watermark;
-      import java.util.ArrayList;
-      import java.util.List;
-
-      public class ModuleManager {
-          private final List<Module> modules = new ArrayList<>();
-
-          public ModuleManager() {
-              // Регистрируем модули
-              addModule(new Watermark());
-          }
-
-          private void addModule(Module module) {
-              modules.add(module);
-          }
-
-          public List<Module> getModules() {
-              return modules;
-          }
-      }
-      EOF
-
-      cat > src/main/java/ru/nix/tolyanvisuals/utils/ColorUtils.java <<'EOF'
-      package ru.nix.tolyanvisuals.utils;
-
-      public class ColorUtils {
-          // Плавный переход от пурпурного к розовому в зависимости от времени
-          public static int getGradient(int offset) {
-              double speed = 3000.0;
-              double time = (System.currentTimeMillis() + offset) % speed / speed;
-              
-              // Accent: #8B5CF6 (Purple)
-              int r1 = 139, g1 = 92, b1 = 246;
-              // Accent Glow: #A855F7 (Pink/Purple)
-              int r2 = 168, g2 = 85, b2 = 247;
-              
-              double factor = (Math.sin(time * Math.PI * 2) + 1.0) / 2.0;
-              
-              int r = (int) (r1 + (r2 - r1) * factor);
-              int g = (int) (g1 + (g2 - g1) * factor);
-              int b = (int) (b1 + (b2 - b1) * factor);
-              
-              return (255 << 24) | (r << 16) | (g << 8) | b;
-          }
-      }
-      EOF
-
-      cat > src/main/java/ru/nix/tolyanvisuals/module/hud/Watermark.java <<'EOF'
-      package ru.nix.tolyanvisuals.module.hud;
-
-      import net.minecraft.client.gui.DrawContext;
-      import ru.nix.tolyanvisuals.module.Category;
-      import ru.nix.tolyanvisuals.module.Module;
-      import ru.nix.tolyanvisuals.utils.ColorUtils;
-      import ru.nix.tolyanvisuals.TolyanVisuals;
-
-      public class Watermark extends Module {
-          
-          public Watermark() {
-              super("Watermark", Category.HUD);
-              setToggled(true); // Включен по умолчанию
-          }
-
-          @Override
-          public void onRender(DrawContext context, float tickDelta) {
-              if (mc.textRenderer == null) return;
-              
-              String text = TolyanVisuals.CLIENT_NAME + " | 1.21.4 | FPS: " + mc.getCurrentFps();
-              
-              int x = 5;
-              int y = 5;
-              
-              // Отрисовка текста по буквам для градиентного эффекта (gradient text)
-              int currentX = x;
-              for (int i = 0; i < text.length(); i++) {
-                  String character = String.valueOf(text.charAt(i));
-                  int color = ColorUtils.getGradient(i * -20);
-                  
-                  context.drawText(mc.textRenderer, character, currentX, y, color, true);
-                  currentX += mc.textRenderer.getWidth(character);
-              }
-          }
-      }
-      EOF
-
-  - name: Set up Java 21
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: 21
-
-  - name: Set up Gradle
-    uses: gradle/actions/setup-gradle@v4
-    with:
-      gradle-version: 8.12.1
-
-  - name: Build jar
-    run: gradle build --no-daemon
-
-  - name: Upload finished jar
-    uses: actions/upload-artifact@v4
-    with:
-      name: TolyanVisuals-1.21.4-Release
-      path: |
-        build/libs/*.jar
-        !build/libs/*-sources.jar
-        !build/libs/*-dev.jar
+      - name: Upload finished jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: TolyanVisuals-1.21.4-Release
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-dev.jar
