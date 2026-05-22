@@ -1,1306 +1,264 @@
-name: Build Ancient Kingdoms Mod
+cat > gradle.properties <<'EOF'
+      org.gradle.jvmargs=-Xmx2G
+      minecraft_version=1.21.4
+      yarn_mappings=1.21.4+build.8
+      loader_version=0.16.10
+      mod_version=1.0.0
+      maven_group=ru.nix.tolyanvisuals
+      archives_base_name=TolyanVisuals-1.21.4
+      EOF
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ "main", "master" ]
+      cat > build.gradle <<'EOF'
+      plugins {
+          id 'fabric-loom' version '1.9-SNAPSHOT'
+      }
+      version = project.mod_version
+      group = project.maven_group
+      base { archivesName = project.archives_base_name }
+      repositories {
+          maven { url = "https://maven.fabricmc.net/" }
+          mavenCentral()
+      }
+      dependencies {
+          minecraft "com.mojang:minecraft:${project.minecraft_version}"
+          mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+          modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+          modImplementation "net.fabricmc.fabric-api:fabric-api:0.114.0+1.21.4"
+      }
+      processResources {
+          inputs.property "version", project.version
+          filesMatching("fabric.mod.json") { expand "version": project.version }
+      }
+      tasks.withType(JavaCompile).configureEach { options.release = 21 }
+      java {
+          sourceCompatibility = JavaVersion.VERSION_21
+          targetCompatibility = JavaVersion.VERSION_21
+      }
+      EOF
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+      cat > src/main/resources/fabric.mod.json <<'EOF'
+      {
+        "schemaVersion": 1,
+        "id": "tolyanvisuals",
+        "version": "${version}",
+        "name": "Tolyan Visuals",
+        "description": "Premium Visual Client for Minecraft 1.21.4",
+        "authors": ["Nix"],
+        "contact": {},
+        "license": "MIT",
+        "icon": "assets/tolyanvisuals/icon.png",
+        "environment": "client",
+        "entrypoints": {
+          "client": [
+            "ru.nix.tolyanvisuals.TolyanVisuals"
+          ]
+        },
+        "depends": {
+          "fabricloader": ">=0.16.10",
+          "minecraft": "1.21.4",
+          "java": ">=21",
+          "fabric-api": "*"
+        }
+      }
+      EOF
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      cat > src/main/java/ru/nix/tolyanvisuals/TolyanVisuals.java <<'EOF'
+      package ru.nix.tolyanvisuals;
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+      import net.fabricmc.api.ClientModInitializer;
+      import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+      import ru.nix.tolyanvisuals.module.ModuleManager;
+      import ru.nix.tolyanvisuals.module.Module;
+      import org.slf4j.Logger;
+      import org.slf4j.LoggerFactory;
 
-      - name: Create project files
-        run: |
-          mkdir -p src/main/java/com/ancientkingdoms/block
-          mkdir -p src/main/java/com/ancientkingdoms/item
-          mkdir -p src/main/java/com/ancientkingdoms/entity
-          mkdir -p src/main/java/com/ancientkingdoms/biome
-          mkdir -p src/main/java/com/ancientkingdoms/kingdom
-          mkdir -p src/main/java/com/ancientkingdoms/blueprint
-          mkdir -p src/main/java/com/ancientkingdoms/network/packets
-          mkdir -p src/main/java/com/ancientkingdoms/gui
-          mkdir -p src/main/java/com/ancientkingdoms/client
-          mkdir -p src/main/resources/META-INF
-          mkdir -p src/main/resources/assets/ancientkingdoms/lang
-          mkdir -p src/main/resources/assets/ancientkingdoms/models/block
-          mkdir -p src/main/resources/assets/ancientkingdoms/models/item
-          mkdir -p src/main/resources/assets/ancientkingdoms/blockstates
-          mkdir -p src/main/resources/data/ancientkingdoms/recipes
-          mkdir -p src/main/resources/data/ancientkingdoms/loot_tables/blocks
+      public class TolyanVisuals implements ClientModInitializer {
+          public static final String MOD_ID = "tolyanvisuals";
+          public static final String CLIENT_NAME = "Tolyan Visuals";
+          public static final Logger LOGGER = LoggerFactory.getLogger(CLIENT_NAME);
+          
+          public static ModuleManager moduleManager;
 
-          cat > settings.gradle << 'ENDOFFILE'
-          pluginManagement {
-              repositories {
-                  gradlePluginPortal()
-                  maven { url = 'https://maven.minecraftforge.net' }
-              }
-          }
-          rootProject.name = 'ancientkingdoms'
-          ENDOFFILE
-
-          cat > gradle.properties << 'ENDOFFILE'
-          org.gradle.jvmargs=-Xmx4G
-          org.gradle.daemon=false
-          ENDOFFILE
-
-          cat > build.gradle << 'ENDOFFILE'
-          plugins {
-              id 'java'
-              id 'net.minecraftforge.gradle' version '6.0.24'
-          }
-          version = '1.0.0'
-          group = 'com.ancientkingdoms'
-          archivesBaseName = 'ancientkingdoms'
-          java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
-          minecraft {
-              mappings channel: 'official', version: '1.21.1'
-              runs {
-                  client {
-                      workingDirectory project.file('run')
-                      property 'forge.logging.console.level', 'debug'
-                      mods { ancientkingdoms { source sourceSets.main } }
-                  }
-                  server {
-                      workingDirectory project.file('run')
-                      property 'forge.logging.console.level', 'debug'
-                      mods { ancientkingdoms { source sourceSets.main } }
-                  }
-              }
-          }
-          repositories {
-              maven { url = 'https://maven.minecraftforge.net' }
-              mavenCentral()
-          }
-          dependencies {
-              minecraft 'net.minecraftforge:forge:1.21.1-52.1.0'
-          }
-          jar {
-              manifest {
-                  attributes([
-                      "Specification-Title": "ancientkingdoms",
-                      "Specification-Version": "1",
-                      "Implementation-Title": project.name,
-                      "Implementation-Version": project.jar.archiveVersion,
-                      "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
-                  ])
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/resources/META-INF/mods.toml << 'ENDOFFILE'
-          modLoader="javafml"
-          loaderVersion="[52,)"
-          license="MIT"
-          [[mods]]
-              modId="ancientkingdoms"
-              version="1.0.0"
-              displayName="Ancient Kingdoms"
-              description="Medieval kingdoms mod!"
-          [[dependencies.ancientkingdoms]]
-              modId="forge"
-              mandatory=true
-              versionRange="[52,)"
-              ordering="NONE"
-              side="BOTH"
-          [[dependencies.ancientkingdoms]]
-              modId="minecraft"
-              mandatory=true
-              versionRange="[1.21.1,1.22)"
-              ordering="NONE"
-              side="BOTH"
-          ENDOFFILE
-
-          printf 'Manifest-Version: 1.0\n' > src/main/resources/META-INF/MANIFEST.MF
-
-          cat > src/main/java/com/ancientkingdoms/AncientKingdoms.java << 'ENDOFFILE'
-          package com.ancientkingdoms;
-          import com.ancientkingdoms.biome.AKBiomes;
-          import com.ancientkingdoms.block.AKBlocks;
-          import com.ancientkingdoms.entity.AKEntities;
-          import com.ancientkingdoms.item.AKItems;
-          import com.ancientkingdoms.network.AKNetwork;
-          import net.minecraftforge.eventbus.api.IEventBus;
-          import net.minecraftforge.fml.common.Mod;
-          import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-          import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-          import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-          import org.apache.logging.log4j.LogManager;
-          import org.apache.logging.log4j.Logger;
-          @Mod(AncientKingdoms.MOD_ID)
-          public class AncientKingdoms {
-              public static final String MOD_ID = "ancientkingdoms";
-              public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
-              public AncientKingdoms() {
-                  IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
-                  AKBlocks.BLOCKS.register(bus);
-                  AKItems.ITEMS.register(bus);
-                  AKEntities.ENTITY_TYPES.register(bus);
-                  AKBiomes.BIOMES.register(bus);
-                  bus.addListener(this::commonSetup);
-                  bus.addListener(this::clientSetup);
-              }
-              private void commonSetup(final FMLCommonSetupEvent e) { AKNetwork.register(); }
-              private void clientSetup(final FMLClientSetupEvent e) {}
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/block/AKBlocks.java << 'ENDOFFILE'
-          package com.ancientkingdoms.block;
-          import com.ancientkingdoms.AncientKingdoms;
-          import net.minecraft.world.level.block.Block;
-          import net.minecraft.world.level.block.SoundType;
-          import net.minecraft.world.level.block.state.BlockBehaviour;
-          import net.minecraft.world.level.material.MapColor;
-          import net.minecraftforge.registries.DeferredRegister;
-          import net.minecraftforge.registries.ForgeRegistries;
-          import net.minecraftforge.registries.RegistryObject;
-          public class AKBlocks {
-              public static final DeferredRegister<Block> BLOCKS =
-                  DeferredRegister.create(ForgeRegistries.BLOCKS, AncientKingdoms.MOD_ID);
-              public static final RegistryObject<Block> ANCIENT_STONE = BLOCKS.register("ancient_stone",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2f,6f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> ANCIENT_STONE_BRICKS = BLOCKS.register("ancient_stone_bricks",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2.5f,7f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> ANCIENT_STONE_PILLAR = BLOCKS.register("ancient_stone_pillar",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2.5f,7f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> CRACKED_ANCIENT_STONE = BLOCKS.register("cracked_ancient_stone",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2f,5f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> RUNE_STONE = BLOCKS.register("rune_stone",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(3f,9f).sound(SoundType.STONE).lightLevel(s -> 4)));
-              public static final RegistryObject<Block> MOSSY_ANCIENT_STONE = BLOCKS.register("mossy_ancient_stone",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2f,6f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> THRONE_BLOCK = BLOCKS.register("throne_block",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.GOLD).strength(3.5f,10f).sound(SoundType.METAL)));
-              public static final RegistryObject<Block> SANDSTONE_BRICK = BLOCKS.register("sandstone_brick",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2f,6f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> MARBLE_BLOCK = BLOCKS.register("marble_block",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(2.5f,7f).sound(SoundType.STONE)));
-              public static final RegistryObject<Block> MARBLE_BRICKS = BLOCKS.register("marble_bricks",
-                  () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(2.5f,7f).sound(SoundType.STONE)));
-              public static final RegistryObject<KingdomFlagBlock> KINGDOM_FLAG =
-                  BLOCKS.register("kingdom_flag", KingdomFlagBlock::new);
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/block/KingdomFlagBlock.java << 'ENDOFFILE'
-          package com.ancientkingdoms.block;
-          import com.ancientkingdoms.kingdom.KingdomData;
-          import com.ancientkingdoms.kingdom.KingdomManager;
-          import com.ancientkingdoms.network.AKNetwork;
-          import com.ancientkingdoms.network.packets.OpenKingdomMenuPacket;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraft.world.InteractionHand;
-          import net.minecraft.world.InteractionResult;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.level.Level;
-          import net.minecraft.world.level.block.Block;
-          import net.minecraft.world.level.block.SoundType;
-          import net.minecraft.world.level.block.state.BlockBehaviour;
-          import net.minecraft.world.level.block.state.BlockState;
-          import net.minecraft.world.level.block.state.StateDefinition;
-          import net.minecraft.world.level.block.state.properties.BooleanProperty;
-          import net.minecraft.world.level.material.MapColor;
-          import net.minecraft.world.phys.BlockHitResult;
-          public class KingdomFlagBlock extends Block {
-              public static final BooleanProperty UPPER = BooleanProperty.create("upper");
-              public KingdomFlagBlock() {
-                  super(BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).strength(2f,5f).sound(SoundType.WOOD).noOcclusion());
-                  registerDefaultState(stateDefinition.any().setValue(UPPER, false));
-              }
-              @Override
-              protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> b) { b.add(UPPER); }
-              @Override
-              public void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
-                  super.onPlace(state, level, pos, old, moved);
-                  if (!level.isClientSide && !state.getValue(UPPER))
-                      for (int i = 1; i <= 2; i++)
-                          level.setBlock(pos.above(i), defaultBlockState().setValue(UPPER, true), 3);
-              }
-              @Override
-              public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
-                  if (!level.isClientSide && !state.getValue(UPPER)) {
-                      for (int i = 1; i <= 2; i++) {
-                          BlockPos up = pos.above(i);
-                          if (level.getBlockState(up).getBlock() instanceof KingdomFlagBlock) level.removeBlock(up, false);
-                      }
-                      KingdomManager.removeKingdomAt(level, pos);
-                  }
-                  super.onRemove(state, level, pos, newState, moved);
-              }
-              @Override
-              public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-                  if (!level.isClientSide) {
-                      BlockPos base = state.getValue(UPPER) ? findBase(level, pos) : pos;
-                      if (base == null) return InteractionResult.FAIL;
-                      KingdomData k = KingdomManager.getKingdomAt(level, base);
-                      if (k == null) k = KingdomManager.createKingdom(level, base, player);
-                      if (player instanceof ServerPlayer sp) {
-                          if (k.isOwner(player.getUUID())) AKNetwork.sendToPlayer(sp, new OpenKingdomMenuPacket(base));
-                          else player.sendSystemMessage(Component.literal("§cThis kingdom belongs to " + k.getOwnerName() + "!"));
+          @Override
+          public void onInitializeClient() {
+              LOGGER.info("Initializing {} Premium UI...", CLIENT_NAME);
+              
+              moduleManager = new ModuleManager();
+              
+              // Хук в рендер HUD'а
+              HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
+                  for (Module module : moduleManager.getModules()) {
+                      if (module.isToggled()) {
+                          module.onRender(drawContext, tickDelta);
                       }
                   }
-                  return InteractionResult.sidedSuccess(level.isClientSide);
-              }
-              private BlockPos findBase(Level level, BlockPos pos) {
-                  for (int i = 0; i <= 2; i++) {
-                      BlockPos c = pos.below(i);
-                      BlockState bs = level.getBlockState(c);
-                      if (bs.getBlock() instanceof KingdomFlagBlock && !bs.getValue(UPPER)) return c;
-                  }
-                  return null;
+              });
+          }
+      }
+      EOF
+
+      cat > src/main/java/ru/nix/tolyanvisuals/module/Category.java <<'EOF'
+      package ru.nix.tolyanvisuals.module;
+
+      public enum Category {
+          VISUAL("Visual"),
+          HUD("HUD"),
+          INTERFACE("Interface"),
+          RENDER("Render"),
+          SETTINGS("Settings"),
+          COSMETICS("Cosmetics");
+
+          public final String name;
+
+          Category(String name) {
+              this.name = name;
+          }
+      }
+      EOF
+
+      cat > src/main/java/ru/nix/tolyanvisuals/module/Module.java <<'EOF'
+      package ru.nix.tolyanvisuals.module;
+
+      import net.minecraft.client.MinecraftClient;
+      import net.minecraft.client.gui.DrawContext;
+
+      public class Module {
+          private final String name;
+          private final Category category;
+          private boolean toggled;
+          protected final MinecraftClient mc = MinecraftClient.getInstance();
+
+          public Module(String name, Category category) {
+              this.name = name;
+              this.category = category;
+              this.toggled = false;
+          }
+
+          public void toggle() {
+              this.toggled = !this.toggled;
+              if (toggled) onEnable();
+              else onDisable();
+          }
+
+          public void onEnable() {}
+          public void onDisable() {}
+          
+          public void onRender(DrawContext context, float tickDelta) {}
+
+          public String getName() { return name; }
+          public Category getCategory() { return category; }
+          public boolean isToggled() { return toggled; }
+          public void setToggled(boolean toggled) { this.toggled = toggled; }
+      }
+      EOF
+
+      cat > src/main/java/ru/nix/tolyanvisuals/module/ModuleManager.java <<'EOF'
+      package ru.nix.tolyanvisuals.module;
+
+      import ru.nix.tolyanvisuals.module.hud.Watermark;
+      import java.util.ArrayList;
+      import java.util.List;
+
+      public class ModuleManager {
+          private final List<Module> modules = new ArrayList<>();
+
+          public ModuleManager() {
+              // Регистрируем модули
+              addModule(new Watermark());
+          }
+
+          private void addModule(Module module) {
+              modules.add(module);
+          }
+
+          public List<Module> getModules() {
+              return modules;
+          }
+      }
+      EOF
+
+      cat > src/main/java/ru/nix/tolyanvisuals/utils/ColorUtils.java <<'EOF'
+      package ru.nix.tolyanvisuals.utils;
+
+      public class ColorUtils {
+          // Плавный переход от пурпурного к розовому в зависимости от времени
+          public static int getGradient(int offset) {
+              double speed = 3000.0;
+              double time = (System.currentTimeMillis() + offset) % speed / speed;
+              
+              // Accent: #8B5CF6 (Purple)
+              int r1 = 139, g1 = 92, b1 = 246;
+              // Accent Glow: #A855F7 (Pink/Purple)
+              int r2 = 168, g2 = 85, b2 = 247;
+              
+              double factor = (Math.sin(time * Math.PI * 2) + 1.0) / 2.0;
+              
+              int r = (int) (r1 + (r2 - r1) * factor);
+              int g = (int) (g1 + (g2 - g1) * factor);
+              int b = (int) (b1 + (b2 - b1) * factor);
+              
+              return (255 << 24) | (r << 16) | (g << 8) | b;
+          }
+      }
+      EOF
+
+      cat > src/main/java/ru/nix/tolyanvisuals/module/hud/Watermark.java <<'EOF'
+      package ru.nix.tolyanvisuals.module.hud;
+
+      import net.minecraft.client.gui.DrawContext;
+      import ru.nix.tolyanvisuals.module.Category;
+      import ru.nix.tolyanvisuals.module.Module;
+      import ru.nix.tolyanvisuals.utils.ColorUtils;
+      import ru.nix.tolyanvisuals.TolyanVisuals;
+
+      public class Watermark extends Module {
+          
+          public Watermark() {
+              super("Watermark", Category.HUD);
+              setToggled(true); // Включен по умолчанию
+          }
+
+          @Override
+          public void onRender(DrawContext context, float tickDelta) {
+              if (mc.textRenderer == null) return;
+              
+              String text = TolyanVisuals.CLIENT_NAME + " | 1.21.4 | FPS: " + mc.getCurrentFps();
+              
+              int x = 5;
+              int y = 5;
+              
+              // Отрисовка текста по буквам для градиентного эффекта (gradient text)
+              int currentX = x;
+              for (int i = 0; i < text.length(); i++) {
+                  String character = String.valueOf(text.charAt(i));
+                  int color = ColorUtils.getGradient(i * -20);
+                  
+                  context.drawText(mc.textRenderer, character, currentX, y, color, true);
+                  currentX += mc.textRenderer.getWidth(character);
               }
           }
-          ENDOFFILE
+      }
+      EOF
 
-          cat > src/main/java/com/ancientkingdoms/item/AKArmorMaterials.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import com.ancientkingdoms.AncientKingdoms;
-          import net.minecraft.sounds.SoundEvent;
-          import net.minecraft.sounds.SoundEvents;
-          import net.minecraft.world.item.ArmorItem;
-          import net.minecraft.world.item.ArmorMaterial;
-          import net.minecraft.world.item.crafting.Ingredient;
-          import net.minecraftforge.common.util.NonNullLazy;
-          import java.util.function.Supplier;
-          public enum AKArmorMaterials implements ArmorMaterial {
-              BRONZE("bronze",15,new int[]{2,5,6,2},9,SoundEvents.ARMOR_EQUIP_IRON,0f,0f,()->Ingredient.of(AKItems.BRONZE_INGOT.get())),
-              KNIGHT("knight_armor",30,new int[]{3,7,8,3},12,SoundEvents.ARMOR_EQUIP_IRON,1f,0.1f,()->Ingredient.of(AKItems.IRON_CHAIN_LINK.get()));
-              private static final int[] HEALTH={13,15,16,11};
-              private final String name; private final int dur; private final int[] armor;
-              private final int ench; private final SoundEvent sound; private final float tough,kbr;
-              private final NonNullLazy<Ingredient> repair;
-              AKArmorMaterials(String n,int d,int[] a,int e,SoundEvent s,float t,float k,Supplier<Ingredient> r){name=n;dur=d;armor=a;ench=e;sound=s;tough=t;kbr=k;repair=NonNullLazy.of(r);}
-              @Override public int getDurabilityForType(ArmorItem.Type t){return HEALTH[t.getSlot().getIndex()]*dur;}
-              @Override public int getDefenseForType(ArmorItem.Type t){return armor[t.getSlot().getIndex()];}
-              @Override public int getEnchantmentValue(){return ench;}
-              @Override public SoundEvent getEquipSound(){return sound;}
-              @Override public Ingredient getRepairIngredient(){return repair.get();}
-              @Override public String getName(){return AncientKingdoms.MOD_ID+":"+name;}
-              @Override public float getToughness(){return tough;}
-              @Override public float getKnockbackResistance(){return kbr;}
-          }
-          ENDOFFILE
+  - name: Set up Java 21
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: 21
 
-          cat > src/main/java/com/ancientkingdoms/item/AKTierMaterials.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import net.minecraft.world.item.Tier;
-          import net.minecraft.world.item.crafting.Ingredient;
-          public enum AKTierMaterials implements Tier {
-              BRONZE(2,250,6.5f,2f,10,()->Ingredient.of(AKItems.BRONZE_INGOT.get())),
-              KNIGHT(3,1500,8f,3f,14,()->Ingredient.of(AKItems.IRON_CHAIN_LINK.get()));
-              private final int lv,uses,ench; private final float spd,dmg;
-              private final java.util.function.Supplier<Ingredient> rep;
-              AKTierMaterials(int l,int u,float s,float d,int e,java.util.function.Supplier<Ingredient> r){lv=l;uses=u;spd=s;dmg=d;ench=e;rep=r;}
-              @Override public int getUses(){return uses;}
-              @Override public float getSpeed(){return spd;}
-              @Override public float getAttackDamageBonus(){return dmg;}
-              @Override public int getLevel(){return lv;}
-              @Override public int getEnchantmentValue(){return ench;}
-              @Override public Ingredient getRepairIngredient(){return rep.get();}
-          }
-          ENDOFFILE
+  - name: Set up Gradle
+    uses: gradle/actions/setup-gradle@v4
+    with:
+      gradle-version: 8.12.1
 
-          cat > src/main/java/com/ancientkingdoms/item/SpearItem.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import net.minecraft.world.item.Item;
-          import net.minecraft.world.item.TieredItem;
-          public class SpearItem extends TieredItem {
-              public SpearItem(Item.Properties p) {
-                  super(AKTierMaterials.KNIGHT, p.attributes(net.minecraft.world.item.SwordItem.createAttributes(AKTierMaterials.KNIGHT,7,-2.8f)));
-              }
-          }
-          ENDOFFILE
+  - name: Build jar
+    run: gradle build --no-daemon
 
-          cat > src/main/java/com/ancientkingdoms/item/WarAxeItem.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import net.minecraft.world.item.AxeItem;
-          import net.minecraft.world.item.Item;
-          public class WarAxeItem extends AxeItem {
-              public WarAxeItem(Item.Properties p) {
-                  super(AKTierMaterials.KNIGHT, p.attributes(AxeItem.createAttributes(AKTierMaterials.KNIGHT,9f,-3.2f)));
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/item/AncientCrossbowItem.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import net.minecraft.world.item.CrossbowItem;
-          import net.minecraft.world.item.Item;
-          public class AncientCrossbowItem extends CrossbowItem {
-              public AncientCrossbowItem(Item.Properties p) { super(p.durability(400)); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/item/BlueprintScrollItem.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import com.ancientkingdoms.network.AKNetwork;
-          import com.ancientkingdoms.network.packets.OpenBlueprintMenuPacket;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraft.world.InteractionHand;
-          import net.minecraft.world.InteractionResultHolder;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.Item;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraft.world.level.Level;
-          public class BlueprintScrollItem extends Item {
-              public BlueprintScrollItem(Properties p) { super(p.stacksTo(1)); }
-              @Override
-              public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-                  if (!level.isClientSide && player instanceof ServerPlayer sp)
-                      AKNetwork.sendToPlayer(sp, new OpenBlueprintMenuPacket());
-                  return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide);
-              }
-              @Override public Component getName(ItemStack s) { return Component.literal("§6§lBlueprint Scroll"); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/item/WorldMapItem.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import com.ancientkingdoms.network.AKNetwork;
-          import com.ancientkingdoms.network.packets.OpenWorldMapPacket;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraft.world.InteractionHand;
-          import net.minecraft.world.InteractionResultHolder;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.Item;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraft.world.level.Level;
-          public class WorldMapItem extends Item {
-              public WorldMapItem(Properties p) { super(p.stacksTo(1)); }
-              @Override
-              public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-                  if (!level.isClientSide && player instanceof ServerPlayer sp)
-                      AKNetwork.sendToPlayer(sp, new OpenWorldMapPacket());
-                  return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide);
-              }
-              @Override public Component getName(ItemStack s) { return Component.literal("§b§lWorld Map"); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/item/AKItems.java << 'ENDOFFILE'
-          package com.ancientkingdoms.item;
-          import com.ancientkingdoms.AncientKingdoms;
-          import com.ancientkingdoms.block.AKBlocks;
-          import net.minecraft.world.item.*;
-          import net.minecraftforge.registries.DeferredRegister;
-          import net.minecraftforge.registries.ForgeRegistries;
-          import net.minecraftforge.registries.RegistryObject;
-          public class AKItems {
-              public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, AncientKingdoms.MOD_ID);
-              private static Item.Properties p() { return new Item.Properties(); }
-              public static final RegistryObject<BlockItem> ANCIENT_STONE_ITEM = ITEMS.register("ancient_stone", () -> new BlockItem(AKBlocks.ANCIENT_STONE.get(), p()));
-              public static final RegistryObject<BlockItem> ANCIENT_STONE_BRICKS_ITEM = ITEMS.register("ancient_stone_bricks", () -> new BlockItem(AKBlocks.ANCIENT_STONE_BRICKS.get(), p()));
-              public static final RegistryObject<BlockItem> ANCIENT_STONE_PILLAR_ITEM = ITEMS.register("ancient_stone_pillar", () -> new BlockItem(AKBlocks.ANCIENT_STONE_PILLAR.get(), p()));
-              public static final RegistryObject<BlockItem> CRACKED_ANCIENT_STONE_ITEM = ITEMS.register("cracked_ancient_stone", () -> new BlockItem(AKBlocks.CRACKED_ANCIENT_STONE.get(), p()));
-              public static final RegistryObject<BlockItem> RUNE_STONE_ITEM = ITEMS.register("rune_stone", () -> new BlockItem(AKBlocks.RUNE_STONE.get(), p()));
-              public static final RegistryObject<BlockItem> MOSSY_ANCIENT_STONE_ITEM = ITEMS.register("mossy_ancient_stone", () -> new BlockItem(AKBlocks.MOSSY_ANCIENT_STONE.get(), p()));
-              public static final RegistryObject<BlockItem> THRONE_BLOCK_ITEM = ITEMS.register("throne_block", () -> new BlockItem(AKBlocks.THRONE_BLOCK.get(), p()));
-              public static final RegistryObject<BlockItem> SANDSTONE_BRICK_ITEM = ITEMS.register("sandstone_brick", () -> new BlockItem(AKBlocks.SANDSTONE_BRICK.get(), p()));
-              public static final RegistryObject<BlockItem> MARBLE_BLOCK_ITEM = ITEMS.register("marble_block", () -> new BlockItem(AKBlocks.MARBLE_BLOCK.get(), p()));
-              public static final RegistryObject<BlockItem> MARBLE_BRICKS_ITEM = ITEMS.register("marble_bricks", () -> new BlockItem(AKBlocks.MARBLE_BRICKS.get(), p()));
-              public static final RegistryObject<BlockItem> KINGDOM_FLAG_ITEM = ITEMS.register("kingdom_flag", () -> new BlockItem(AKBlocks.KINGDOM_FLAG.get(), p()));
-              public static final RegistryObject<Item> BRONZE_INGOT = ITEMS.register("bronze_ingot", () -> new Item(p()));
-              public static final RegistryObject<Item> IRON_CHAIN_LINK = ITEMS.register("iron_chain_link", () -> new Item(p()));
-              public static final RegistryObject<Item> ANCIENT_COIN = ITEMS.register("ancient_coin", () -> new Item(p()));
-              public static final RegistryObject<Item> KINGDOM_EMBLEM = ITEMS.register("kingdom_emblem", () -> new Item(p()));
-              public static final RegistryObject<ArmorItem> BRONZE_HELMET = ITEMS.register("bronze_helmet", () -> new ArmorItem(AKArmorMaterials.BRONZE, ArmorItem.Type.HELMET, p()));
-              public static final RegistryObject<ArmorItem> BRONZE_CHESTPLATE = ITEMS.register("bronze_chestplate", () -> new ArmorItem(AKArmorMaterials.BRONZE, ArmorItem.Type.CHESTPLATE, p()));
-              public static final RegistryObject<ArmorItem> BRONZE_LEGGINGS = ITEMS.register("bronze_leggings", () -> new ArmorItem(AKArmorMaterials.BRONZE, ArmorItem.Type.LEGGINGS, p()));
-              public static final RegistryObject<ArmorItem> BRONZE_BOOTS = ITEMS.register("bronze_boots", () -> new ArmorItem(AKArmorMaterials.BRONZE, ArmorItem.Type.BOOTS, p()));
-              public static final RegistryObject<ArmorItem> KNIGHT_HELMET = ITEMS.register("knight_helmet", () -> new ArmorItem(AKArmorMaterials.KNIGHT, ArmorItem.Type.HELMET, p()));
-              public static final RegistryObject<ArmorItem> KNIGHT_CHESTPLATE = ITEMS.register("knight_chestplate", () -> new ArmorItem(AKArmorMaterials.KNIGHT, ArmorItem.Type.CHESTPLATE, p()));
-              public static final RegistryObject<ArmorItem> KNIGHT_LEGGINGS = ITEMS.register("knight_leggings", () -> new ArmorItem(AKArmorMaterials.KNIGHT, ArmorItem.Type.LEGGINGS, p()));
-              public static final RegistryObject<ArmorItem> KNIGHT_BOOTS = ITEMS.register("knight_boots", () -> new ArmorItem(AKArmorMaterials.KNIGHT, ArmorItem.Type.BOOTS, p()));
-              public static final RegistryObject<SwordItem> BRONZE_SWORD = ITEMS.register("bronze_sword", () -> new SwordItem(AKTierMaterials.BRONZE, 3, -2.4f, p()));
-              public static final RegistryObject<SwordItem> KNIGHT_SWORD = ITEMS.register("knight_sword", () -> new SwordItem(AKTierMaterials.KNIGHT, 5, -2.2f, p()));
-              public static final RegistryObject<Item> SPEAR = ITEMS.register("spear", () -> new SpearItem(p()));
-              public static final RegistryObject<Item> WAR_AXE = ITEMS.register("war_axe", () -> new WarAxeItem(p()));
-              public static final RegistryObject<Item> CROSSBOW_ANCIENT = ITEMS.register("crossbow_ancient", () -> new AncientCrossbowItem(p()));
-              public static final RegistryObject<Item> BLUEPRINT_SCROLL = ITEMS.register("blueprint_scroll", () -> new BlueprintScrollItem(p()));
-              public static final RegistryObject<Item> WORLD_MAP = ITEMS.register("world_map", () -> new WorldMapItem(p()));
-              public static final RegistryObject<Item> QUEST_SCROLL = ITEMS.register("quest_scroll", () -> new Item(p()));
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/kingdom/KingdomData.java << 'ENDOFFILE'
-          package com.ancientkingdoms.kingdom;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.nbt.*;
-          import java.util.*;
-          public class KingdomData {
-              public static final int TERRITORY_RADIUS = 128;
-              private UUID ownerId; private String ownerName, kingdomName;
-              private BlockPos flagPos; private int level, xp;
-              private final List<BuildingSlot> buildings = new ArrayList<>();
-              private final List<NpcWorker> workers = new ArrayList<>();
-              public KingdomData() {}
-              public KingdomData(UUID oid, String oname, BlockPos fp) {
-                  ownerId=oid; ownerName=oname; kingdomName=oname+"'s Kingdom"; flagPos=fp; level=1; xp=0;
-                  buildings.add(new BuildingSlot("Barracks",0,100)); buildings.add(new BuildingSlot("Blacksmith",0,150));
-                  buildings.add(new BuildingSlot("Farm",0,80)); buildings.add(new BuildingSlot("Market",0,200));
-                  buildings.add(new BuildingSlot("Watchtower",0,120)); buildings.add(new BuildingSlot("Library",0,175));
-                  buildings.add(new BuildingSlot("Castle Wall",0,250)); buildings.add(new BuildingSlot("Royal Palace",0,500));
-              }
-              public UUID getOwnerId(){return ownerId;} public String getOwnerName(){return ownerName;}
-              public String getKingdomName(){return kingdomName;} public void setKingdomName(String n){kingdomName=n;}
-              public BlockPos getFlagPos(){return flagPos;} public int getLevel(){return level;} public int getXp(){return xp;}
-              public List<BuildingSlot> getBuildings(){return buildings;} public List<NpcWorker> getWorkers(){return workers;}
-              public boolean isOwner(UUID u){return ownerId.equals(u);}
-              public boolean isInsideTerritory(BlockPos p){
-                  double dx=p.getX()-flagPos.getX(), dz=p.getZ()-flagPos.getZ();
-                  return Math.sqrt(dx*dx+dz*dz)<=TERRITORY_RADIUS;
-              }
-              public void addXp(int a){xp+=a; int n=xpForNextLevel(); while(xp>=n){xp-=n;level++;n=xpForNextLevel();}}
-              public int xpForNextLevel(){return 200+(level-1)*100;}
-              public CompoundTag save(){
-                  CompoundTag t=new CompoundTag();
-                  t.putUUID("OwnerId",ownerId); t.putString("OwnerName",ownerName); t.putString("KingdomName",kingdomName);
-                  t.putInt("FlagX",flagPos.getX()); t.putInt("FlagY",flagPos.getY()); t.putInt("FlagZ",flagPos.getZ());
-                  t.putInt("Level",level); t.putInt("Xp",xp);
-                  ListTag bl=new ListTag(); for(BuildingSlot b:buildings) bl.add(b.save()); t.put("Buildings",bl);
-                  ListTag wl=new ListTag(); for(NpcWorker w:workers) wl.add(w.save()); t.put("Workers",wl);
-                  return t;
-              }
-              public static KingdomData load(CompoundTag t){
-                  KingdomData d=new KingdomData();
-                  d.ownerId=t.getUUID("OwnerId"); d.ownerName=t.getString("OwnerName"); d.kingdomName=t.getString("KingdomName");
-                  d.flagPos=new BlockPos(t.getInt("FlagX"),t.getInt("FlagY"),t.getInt("FlagZ"));
-                  d.level=t.getInt("Level"); d.xp=t.getInt("Xp");
-                  ListTag bl=t.getList("Buildings",Tag.TAG_COMPOUND); for(int i=0;i<bl.size();i++) d.buildings.add(BuildingSlot.load(bl.getCompound(i)));
-                  ListTag wl=t.getList("Workers",Tag.TAG_COMPOUND); for(int i=0;i<wl.size();i++) d.workers.add(NpcWorker.load(wl.getCompound(i)));
-                  return d;
-              }
-              public static class BuildingSlot {
-                  public String name; public int currentLevel, xpCost;
-                  public BuildingSlot(String n,int l,int c){name=n;currentLevel=l;xpCost=c;}
-                  public CompoundTag save(){CompoundTag t=new CompoundTag();t.putString("Name",name);t.putInt("Level",currentLevel);t.putInt("XpCost",xpCost);return t;}
-                  public static BuildingSlot load(CompoundTag t){return new BuildingSlot(t.getString("Name"),t.getInt("Level"),t.getInt("XpCost"));}
-              }
-              public static class NpcWorker {
-                  public UUID workerId; public String displayName;
-                  public String currentTask=""; public long taskFinishTime=0;
-                  public NpcWorker(UUID id,String n){workerId=id;displayName=n;}
-                  public boolean isBusy(){return !currentTask.isEmpty()&&System.currentTimeMillis()<taskFinishTime;}
-                  public long secondsLeft(){return Math.max(0,(taskFinishTime-System.currentTimeMillis())/1000);}
-                  public CompoundTag save(){CompoundTag t=new CompoundTag();t.putUUID("WorkerId",workerId);t.putString("Name",displayName);t.putString("Task",currentTask);t.putLong("Finish",taskFinishTime);return t;}
-                  public static NpcWorker load(CompoundTag t){NpcWorker w=new NpcWorker(t.getUUID("WorkerId"),t.getString("Name"));w.currentTask=t.getString("Task");w.taskFinishTime=t.getLong("Finish");return w;}
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/kingdom/KingdomManager.java << 'ENDOFFILE'
-          package com.ancientkingdoms.kingdom;
-          import com.ancientkingdoms.AncientKingdoms;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.nbt.*;
-          import net.minecraft.server.level.ServerLevel;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.level.Level;
-          import net.minecraft.world.level.saveddata.SavedData;
-          import javax.annotation.Nullable;
-          import java.util.*;
-          public class KingdomManager extends SavedData {
-              private static final String NAME = AncientKingdoms.MOD_ID + "_kingdoms";
-              private final Map<BlockPos,KingdomData> kingdoms = new HashMap<>();
-              public static KingdomManager get(Level level) {
-                  if (level instanceof ServerLevel sl) return sl.getDataStorage().computeIfAbsent(KingdomManager::load, KingdomManager::new, NAME);
-                  throw new IllegalStateException("Client side!");
-              }
-              public static @Nullable KingdomData getKingdomAt(Level level, BlockPos pos) { return get(level).kingdoms.get(pos); }
-              public static KingdomData createKingdom(Level level, BlockPos fp, Player player) {
-                  KingdomData d = new KingdomData(player.getUUID(), player.getName().getString(), fp);
-                  KingdomManager m = get(level); m.kingdoms.put(fp, d); m.setDirty(); return d;
-              }
-              public static void removeKingdomAt(Level level, BlockPos pos) { KingdomManager m=get(level); m.kingdoms.remove(pos); m.setDirty(); }
-              public static Collection<KingdomData> getAllKingdoms(Level level) { return get(level).kingdoms.values(); }
-              public static @Nullable KingdomData getKingdomForPos(Level level, BlockPos pos) {
-                  for (KingdomData k : get(level).kingdoms.values()) if (k.isInsideTerritory(pos)) return k;
-                  return null;
-              }
-              @Override public CompoundTag save(CompoundTag tag) {
-                  ListTag list = new ListTag(); for (KingdomData k : kingdoms.values()) list.add(k.save()); tag.put("Kingdoms", list); return tag;
-              }
-              public static KingdomManager load(CompoundTag tag) {
-                  KingdomManager m = new KingdomManager();
-                  ListTag list = tag.getList("Kingdoms", Tag.TAG_COMPOUND);
-                  for (int i=0; i<list.size(); i++) { KingdomData k=KingdomData.load(list.getCompound(i)); m.kingdoms.put(k.getFlagPos(),k); }
-                  return m;
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/blueprint/BlueprintDefinition.java << 'ENDOFFILE'
-          package com.ancientkingdoms.blueprint;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.resources.ResourceLocation;
-          import net.minecraft.world.level.block.state.BlockState;
-          import java.util.Map;
-          public class BlueprintDefinition {
-              private final String id, displayName, description;
-              private final Map<BlockPos, BlockState> blocks;
-              private final Map<ResourceLocation, Integer> requirements;
-              public BlueprintDefinition(String id, String dn, String desc, Map<BlockPos,BlockState> b, Map<ResourceLocation,Integer> r) {
-                  this.id=id; displayName=dn; description=desc; blocks=b; requirements=r;
-              }
-              public String getId(){return id;} public String getDisplayName(){return displayName;} public String getDescription(){return description;}
-              public Map<BlockPos,BlockState> getBlocks(){return blocks;} public Map<ResourceLocation,Integer> getRequirements(){return requirements;}
-              public String getDimensions(){
-                  int mx=0,my=0,mz=0;
-                  for(BlockPos p:blocks.keySet()){mx=Math.max(mx,Math.abs(p.getX()));my=Math.max(my,p.getY());mz=Math.max(mz,Math.abs(p.getZ()));}
-                  return (mx*2+1)+"x"+(my+1)+"x"+(mz*2+1);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/blueprint/BlueprintRegistry.java << 'ENDOFFILE'
-          package com.ancientkingdoms.blueprint;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.resources.ResourceLocation;
-          import net.minecraft.world.level.block.Blocks;
-          import net.minecraft.world.level.block.state.BlockState;
-          import java.util.*;
-          public class BlueprintRegistry {
-              private static final List<BlueprintDefinition> ALL = new ArrayList<>();
-              static {
-                  Map<BlockPos,BlockState> wb=new LinkedHashMap<>();
-                  for(int x=-3;x<=3;x++){wb.put(new BlockPos(x,0,0),Blocks.OAK_PLANKS.defaultBlockState());wb.put(new BlockPos(x,1,0),Blocks.OAK_PLANKS.defaultBlockState());wb.put(new BlockPos(x,2,0),Blocks.OAK_FENCE.defaultBlockState());}
-                  ALL.add(new BlueprintDefinition("wooden_wall","§aWooden Wall","Basic palisade.",wb,req("minecraft:oak_planks",14,"minecraft:oak_fence",7)));
-                  Map<BlockPos,BlockState> sb=new LinkedHashMap<>();
-                  for(int x=-4;x<=4;x++){for(int y=0;y<3;y++)sb.put(new BlockPos(x,y,0),Blocks.STONE_BRICKS.defaultBlockState());sb.put(new BlockPos(x,3,0),Blocks.STONE_BRICK_WALL.defaultBlockState());}
-                  ALL.add(new BlueprintDefinition("stone_wall","§7Stone Wall","Stone wall.",sb,req("minecraft:stone_bricks",27,"minecraft:stone_brick_wall",9)));
-                  Map<BlockPos,BlockState> wt=new LinkedHashMap<>();
-                  for(int y=0;y<5;y++)for(int x=-1;x<=1;x++)for(int z=-1;z<=1;z++)if(Math.abs(x)==1||Math.abs(z)==1)wt.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());
-                  wt.put(new BlockPos(0,5,0),Blocks.TORCH.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("wooden_tower","§aWooden Tower","3x3 tower.",wt,req("minecraft:oak_log",24,"minecraft:torch",1)));
-                  Map<BlockPos,BlockState> st=new LinkedHashMap<>();
-                  for(int y=0;y<7;y++)for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)if(Math.abs(x)==2||Math.abs(z)==2)st.put(new BlockPos(x,y,z),Blocks.STONE_BRICKS.defaultBlockState());
-                  st.put(new BlockPos(0,7,0),Blocks.LANTERN.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("stone_tower","§7Stone Tower","5x5 tower.",st,req("minecraft:stone_bricks",80,"minecraft:lantern",1)));
-                  Map<BlockPos,BlockState> cab=new LinkedHashMap<>();
-                  for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)cab.put(new BlockPos(x,0,z),Blocks.OAK_PLANKS.defaultBlockState());
-                  for(int y=1;y<=3;y++)for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)if(Math.abs(x)==2||Math.abs(z)==2)cab.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("small_cabin","§6Small Cabin","5x5 cabin.",cab,req("minecraft:oak_planks",25,"minecraft:oak_log",30)));
-                  Map<BlockPos,BlockState> gate=new LinkedHashMap<>();
-                  for(int y=0;y<4;y++){gate.put(new BlockPos(-2,y,0),Blocks.STONE_BRICKS.defaultBlockState());gate.put(new BlockPos(2,y,0),Blocks.STONE_BRICKS.defaultBlockState());}
-                  for(int x=-1;x<=1;x++)gate.put(new BlockPos(x,3,0),Blocks.STONE_BRICKS.defaultBlockState());
-                  gate.put(new BlockPos(-1,0,0),Blocks.OAK_DOOR.defaultBlockState());gate.put(new BlockPos(1,0,0),Blocks.OAK_DOOR.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("medieval_gate","§8Medieval Gate","Stone gate.",gate,req("minecraft:stone_bricks",11,"minecraft:oak_door",2)));
-                  Map<BlockPos,BlockState> well=new LinkedHashMap<>();
-                  for(int x=-1;x<=1;x++)for(int z=-1;z<=1;z++)if(Math.abs(x)==1||Math.abs(z)==1)well.put(new BlockPos(x,0,z),Blocks.COBBLESTONE.defaultBlockState());
-                  well.put(new BlockPos(0,0,0),Blocks.WATER.defaultBlockState());
-                  for(int x:new int[]{-1,1}){well.put(new BlockPos(x,1,0),Blocks.OAK_FENCE.defaultBlockState());well.put(new BlockPos(x,2,0),Blocks.OAK_FENCE.defaultBlockState());}
-                  for(int x=-1;x<=1;x++)well.put(new BlockPos(x,3,0),Blocks.OAK_SLAB.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("well","§bWell","Stone well.",well,req("minecraft:cobblestone",8,"minecraft:oak_fence",4,"minecraft:oak_slab",3)));
-                  Map<BlockPos,BlockState> tmpl=new LinkedHashMap<>();
-                  for(int x=-3;x<=3;x++)for(int z=-3;z<=3;z++)tmpl.put(new BlockPos(x,0,z),Blocks.SANDSTONE.defaultBlockState());
-                  for(int[]c:new int[][]{{-3,-3},{-3,3},{3,-3},{3,3}})for(int y=1;y<=5;y++)tmpl.put(new BlockPos(c[0],y,c[1]),Blocks.SANDSTONE.defaultBlockState());
-                  for(int x=-3;x<=3;x++)for(int z=-3;z<=3;z++)tmpl.put(new BlockPos(x,6,z),Blocks.SANDSTONE_SLAB.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("ancient_temple","§6Ancient Temple","Sandstone temple.",tmpl,req("minecraft:sandstone",100,"minecraft:sandstone_slab",49)));
-                  Map<BlockPos,BlockState> fw=new LinkedHashMap<>();
-                  for(int x=-6;x<=6;x++)for(int y=0;y<5;y++)fw.put(new BlockPos(x,y,0),Blocks.STONE_BRICKS.defaultBlockState());
-                  for(int x=-6;x<=6;x+=2)fw.put(new BlockPos(x,5,0),Blocks.STONE_BRICK_WALL.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("fortress_wall","§8Fortress Wall","Fortress wall.",fw,req("minecraft:stone_bricks",65,"minecraft:stone_brick_wall",7)));
-                  Map<BlockPos,BlockState> bar=new LinkedHashMap<>();
-                  for(int x=-3;x<=3;x++)for(int z=0;z<5;z++)bar.put(new BlockPos(x,0,z),Blocks.OAK_PLANKS.defaultBlockState());
-                  for(int y=1;y<=3;y++){for(int x:new int[]{-3,3})for(int z=0;z<5;z++)bar.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());for(int z:new int[]{0,4})for(int x=-3;x<=3;x++)bar.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());}
-                  ALL.add(new BlueprintDefinition("barracks","§cBarracks","7x5 barracks.",bar,req("minecraft:oak_planks",35,"minecraft:oak_log",42)));
-                  Map<BlockPos,BlockState> smy=new LinkedHashMap<>();
-                  for(int x=0;x<4;x++)for(int z=0;z<3;z++)smy.put(new BlockPos(x,0,z),Blocks.STONE.defaultBlockState());
-                  smy.put(new BlockPos(1,1,1),Blocks.BLAST_FURNACE.defaultBlockState());smy.put(new BlockPos(2,1,1),Blocks.ANVIL.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("smithy","§8Smithy","Blacksmith.",smy,req("minecraft:stone",12,"minecraft:blast_furnace",1,"minecraft:anvil",1)));
-                  Map<BlockPos,BlockState> farm=new LinkedHashMap<>();
-                  for(int x=-3;x<=3;x++)for(int z=-3;z<=3;z++)farm.put(new BlockPos(x,0,z),Blocks.FARMLAND.defaultBlockState());
-                  farm.put(new BlockPos(0,0,0),Blocks.WATER.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("farm_plot","§2Farm Plot","7x7 farm.",farm,req("minecraft:dirt",48,"minecraft:water_bucket",1)));
-                  Map<BlockPos,BlockState> gran=new LinkedHashMap<>();
-                  for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)gran.put(new BlockPos(x,0,z),Blocks.OAK_PLANKS.defaultBlockState());
-                  for(int y=1;y<=3;y++){for(int x:new int[]{-2,2})for(int z=-2;z<=2;z++)gran.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());for(int z:new int[]{-2,2})for(int x=-2;x<=2;x++)gran.put(new BlockPos(x,y,z),Blocks.OAK_LOG.defaultBlockState());}
-                  for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)gran.put(new BlockPos(x,4,z),Blocks.HAY_BLOCK.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("granary","§eGranary","5x5 granary.",gran,req("minecraft:oak_planks",25,"minecraft:oak_log",36,"minecraft:hay_block",25)));
-                  Map<BlockPos,BlockState> rt=new LinkedHashMap<>();
-                  for(int y=0;y<10;y++)for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)if(Math.abs(x)==2||Math.abs(z)==2)rt.put(new BlockPos(x,y,z),Blocks.POLISHED_DEEPSLATE.defaultBlockState());
-                  rt.put(new BlockPos(0,10,0),Blocks.GOLD_BLOCK.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("royal_tower","§6Royal Tower","10-tall tower.",rt,req("minecraft:polished_deepslate",80,"minecraft:gold_block",1)));
-                  Map<BlockPos,BlockState> hd=new LinkedHashMap<>();
-                  for(int z=0;z<8;z++){hd.put(new BlockPos(0,0,z),Blocks.OAK_PLANKS.defaultBlockState());hd.put(new BlockPos(-1,-1,z),Blocks.OAK_FENCE.defaultBlockState());hd.put(new BlockPos(1,-1,z),Blocks.OAK_FENCE.defaultBlockState());}
-                  ALL.add(new BlueprintDefinition("harbour_dock","§3Harbour Dock","Wooden dock.",hd,req("minecraft:oak_planks",8,"minecraft:oak_fence",16)));
-                  Map<BlockPos,BlockState> aq=new LinkedHashMap<>();
-                  for(int x=-5;x<=5;x++){aq.put(new BlockPos(x,0,0),Blocks.STONE_BRICKS.defaultBlockState());aq.put(new BlockPos(x,0,1),Blocks.WATER.defaultBlockState());aq.put(new BlockPos(x,0,2),Blocks.STONE_BRICKS.defaultBlockState());aq.put(new BlockPos(x,-1,0),Blocks.STONE_BRICK_WALL.defaultBlockState());aq.put(new BlockPos(x,-1,2),Blocks.STONE_BRICK_WALL.defaultBlockState());}
-                  ALL.add(new BlueprintDefinition("aqueduct","§bAqueduct","Water aqueduct.",aq,req("minecraft:stone_bricks",44,"minecraft:water_bucket",11)));
-                  Map<BlockPos,BlockState> cp=new LinkedHashMap<>();
-                  cp.put(new BlockPos(0,0,0),Blocks.CAMPFIRE.defaultBlockState());
-                  for(int x=-1;x<=1;x++)for(int z=-1;z<=1;z++)if(x!=0||z!=0)cp.put(new BlockPos(x,0,z),Blocks.DIRT.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("campfire","§cCampfire","Campfire.",cp,req("minecraft:campfire",1,"minecraft:dirt",8)));
-                  Map<BlockPos,BlockState> ar=new LinkedHashMap<>();
-                  for(int z=0;z<10;z++)ar.put(new BlockPos(0,0,z),Blocks.GRAVEL.defaultBlockState());
-                  ar.put(new BlockPos(0,0,9),Blocks.HAY_BLOCK.defaultBlockState());ar.put(new BlockPos(0,1,9),Blocks.HAY_BLOCK.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("archery_range","§9Archery Range","Range.",ar,req("minecraft:gravel",10,"minecraft:hay_block",2)));
-                  Map<BlockPos,BlockState> ms=new LinkedHashMap<>();
-                  for(int x=-2;x<=2;x++)ms.put(new BlockPos(x,0,0),Blocks.OAK_PLANKS.defaultBlockState());
-                  for(int x=-1;x<=1;x++)ms.put(new BlockPos(x,1,0),Blocks.OAK_SLAB.defaultBlockState());
-                  ALL.add(new BlueprintDefinition("market_stall","§eMarket Stall","Market stall.",ms,req("minecraft:oak_planks",5,"minecraft:oak_slab",3)));
-              }
-              private static Map<ResourceLocation,Integer> req(Object... pairs){
-                  Map<ResourceLocation,Integer> m=new LinkedHashMap<>();
-                  for(int i=0;i<pairs.length;i+=2)m.put(new ResourceLocation(pairs[i].toString()),(int)pairs[i+1]);
-                  return m;
-              }
-              public static List<BlueprintDefinition> getAll(){return Collections.unmodifiableList(ALL);}
-              public static BlueprintDefinition get(int i){return ALL.get(i%ALL.size());}
-              public static int size(){return ALL.size();}
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/AKNetwork.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network;
-          import com.ancientkingdoms.AncientKingdoms;
-          import com.ancientkingdoms.network.packets.*;
-          import net.minecraft.resources.ResourceLocation;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraftforge.network.*;
-          import net.minecraftforge.network.simple.SimpleChannel;
-          public class AKNetwork {
-              private static final String PROTOCOL = "1";
-              public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-                  new ResourceLocation(AncientKingdoms.MOD_ID, "main"), () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
-              private static int id = 0;
-              public static void register() {
-                  CHANNEL.messageBuilder(OpenKingdomMenuPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT).encoder(OpenKingdomMenuPacket::encode).decoder(OpenKingdomMenuPacket::decode).consumerMainThread(OpenKingdomMenuPacket::handle).add();
-                  CHANNEL.messageBuilder(OpenBlueprintMenuPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT).encoder(OpenBlueprintMenuPacket::encode).decoder(OpenBlueprintMenuPacket::decode).consumerMainThread(OpenBlueprintMenuPacket::handle).add();
-                  CHANNEL.messageBuilder(OpenWorldMapPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT).encoder(OpenWorldMapPacket::encode).decoder(OpenWorldMapPacket::decode).consumerMainThread(OpenWorldMapPacket::handle).add();
-                  CHANNEL.messageBuilder(SyncKingdomDataPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT).encoder(SyncKingdomDataPacket::encode).decoder(SyncKingdomDataPacket::decode).consumerMainThread(SyncKingdomDataPacket::handle).add();
-                  CHANNEL.messageBuilder(KingdomUpgradePacket.class, id++, NetworkDirection.PLAY_TO_SERVER).encoder(KingdomUpgradePacket::encode).decoder(KingdomUpgradePacket::decode).consumerMainThread(KingdomUpgradePacket::handle).add();
-                  CHANNEL.messageBuilder(PlaceBlueprintPacket.class, id++, NetworkDirection.PLAY_TO_SERVER).encoder(PlaceBlueprintPacket::encode).decoder(PlaceBlueprintPacket::decode).consumerMainThread(PlaceBlueprintPacket::handle).add();
-                  CHANNEL.messageBuilder(SetKingdomNamePacket.class, id++, NetworkDirection.PLAY_TO_SERVER).encoder(SetKingdomNamePacket::encode).decoder(SetKingdomNamePacket::decode).consumerMainThread(SetKingdomNamePacket::handle).add();
-              }
-              public static <T> void sendToPlayer(ServerPlayer p, T msg) { CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), msg); }
-              public static <T> void sendToServer(T msg) { CHANNEL.sendToServer(msg); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/OpenKingdomMenuPacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class OpenKingdomMenuPacket {
-              private final BlockPos flagPos;
-              public OpenKingdomMenuPacket(BlockPos p) { flagPos = p; }
-              public static void encode(OpenKingdomMenuPacket m, FriendlyByteBuf b) { b.writeBlockPos(m.flagPos); }
-              public static OpenKingdomMenuPacket decode(FriendlyByteBuf b) { return new OpenKingdomMenuPacket(b.readBlockPos()); }
-              public static void handle(OpenKingdomMenuPacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(() -> com.ancientkingdoms.gui.ClientGuiHelper.openKingdomMenu(m.flagPos));
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/OpenBlueprintMenuPacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class OpenBlueprintMenuPacket {
-              public OpenBlueprintMenuPacket() {}
-              public static void encode(OpenBlueprintMenuPacket m, FriendlyByteBuf b) {}
-              public static OpenBlueprintMenuPacket decode(FriendlyByteBuf b) { return new OpenBlueprintMenuPacket(); }
-              public static void handle(OpenBlueprintMenuPacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(com.ancientkingdoms.gui.ClientGuiHelper::openBlueprintMenu);
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/OpenWorldMapPacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class OpenWorldMapPacket {
-              public OpenWorldMapPacket() {}
-              public static void encode(OpenWorldMapPacket m, FriendlyByteBuf b) {}
-              public static OpenWorldMapPacket decode(FriendlyByteBuf b) { return new OpenWorldMapPacket(); }
-              public static void handle(OpenWorldMapPacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(com.ancientkingdoms.gui.ClientGuiHelper::openWorldMap);
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/SyncKingdomDataPacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import com.ancientkingdoms.kingdom.KingdomData;
-          import net.minecraft.nbt.CompoundTag;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class SyncKingdomDataPacket {
-              private final CompoundTag nbt;
-              public SyncKingdomDataPacket(KingdomData d) { nbt = d.save(); }
-              private SyncKingdomDataPacket(CompoundTag n) { nbt = n; }
-              public static void encode(SyncKingdomDataPacket m, FriendlyByteBuf b) { b.writeNbt(m.nbt); }
-              public static SyncKingdomDataPacket decode(FriendlyByteBuf b) { return new SyncKingdomDataPacket(b.readNbt()); }
-              public static void handle(SyncKingdomDataPacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(() -> com.ancientkingdoms.client.ClientKingdomCache.setCurrent(KingdomData.load(m.nbt)));
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/KingdomUpgradePacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import com.ancientkingdoms.kingdom.*;
-          import com.ancientkingdoms.network.AKNetwork;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class KingdomUpgradePacket {
-              private final BlockPos fp; private final int idx;
-              public KingdomUpgradePacket(BlockPos p, int i) { fp=p; idx=i; }
-              public static void encode(KingdomUpgradePacket m, FriendlyByteBuf b) { b.writeBlockPos(m.fp); b.writeInt(m.idx); }
-              public static KingdomUpgradePacket decode(FriendlyByteBuf b) { return new KingdomUpgradePacket(b.readBlockPos(), b.readInt()); }
-              public static void handle(KingdomUpgradePacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(() -> {
-                      ServerPlayer p = ctx.get().getSender(); if (p==null) return;
-                      KingdomData k = KingdomManager.getKingdomAt(p.level(), m.fp); if (k==null||!k.isOwner(p.getUUID())) return;
-                      if (m.idx<0||m.idx>=k.getBuildings().size()) return;
-                      KingdomData.BuildingSlot b = k.getBuildings().get(m.idx);
-                      if (k.getXp()>=b.xpCost) { k.addXp(-b.xpCost); b.currentLevel++; KingdomManager.get(p.level()).setDirty(); AKNetwork.sendToPlayer(p, new SyncKingdomDataPacket(k)); }
-                      else p.sendSystemMessage(Component.literal("§cNot enough Kingdom XP!"));
-                  });
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/PlaceBlueprintPacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import com.ancientkingdoms.blueprint.*;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.resources.ResourceLocation;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraft.world.level.block.state.BlockState;
-          import net.minecraftforge.network.NetworkEvent;
-          import net.minecraftforge.registries.ForgeRegistries;
-          import java.util.Map;
-          import java.util.function.Supplier;
-          public class PlaceBlueprintPacket {
-              private final int idx; private final BlockPos origin;
-              public PlaceBlueprintPacket(int i, BlockPos p) { idx=i; origin=p; }
-              public static void encode(PlaceBlueprintPacket m, FriendlyByteBuf b) { b.writeInt(m.idx); b.writeBlockPos(m.origin); }
-              public static PlaceBlueprintPacket decode(FriendlyByteBuf b) { return new PlaceBlueprintPacket(b.readInt(), b.readBlockPos()); }
-              public static void handle(PlaceBlueprintPacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(() -> {
-                      ServerPlayer p = ctx.get().getSender(); if (p==null) return;
-                      if (m.idx<0||m.idx>=BlueprintRegistry.size()) return;
-                      BlueprintDefinition bp = BlueprintRegistry.get(m.idx);
-                      for (Map.Entry<ResourceLocation,Integer> req : bp.getRequirements().entrySet()) {
-                          var item = ForgeRegistries.ITEMS.getValue(req.getKey()); if (item==null) continue;
-                          int need=req.getValue(), have=0;
-                          for (ItemStack s : p.getInventory().items) if (s.getItem()==item) have+=s.getCount();
-                          if (have<need) { p.sendSystemMessage(Component.literal("§cNeed "+need+" "+item.getDescription().getString())); return; }
-                      }
-                      for (Map.Entry<ResourceLocation,Integer> req : bp.getRequirements().entrySet()) {
-                          var item = ForgeRegistries.ITEMS.getValue(req.getKey()); if (item==null) continue;
-                          int left=req.getValue();
-                          for (ItemStack s : p.getInventory().items) { if (s.getItem()==item&&left>0) { int t=Math.min(s.getCount(),left); s.shrink(t); left-=t; } }
-                      }
-                      for (Map.Entry<BlockPos,BlockState> e : bp.getBlocks().entrySet()) p.level().setBlock(m.origin.offset(e.getKey()), e.getValue(), 3);
-                      p.sendSystemMessage(Component.literal("§a Placed: "+bp.getDisplayName()));
-                  });
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/network/packets/SetKingdomNamePacket.java << 'ENDOFFILE'
-          package com.ancientkingdoms.network.packets;
-          import com.ancientkingdoms.kingdom.*;
-          import com.ancientkingdoms.network.AKNetwork;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.FriendlyByteBuf;
-          import net.minecraft.server.level.ServerPlayer;
-          import net.minecraftforge.network.NetworkEvent;
-          import java.util.function.Supplier;
-          public class SetKingdomNamePacket {
-              private final BlockPos fp; private final String name;
-              public SetKingdomNamePacket(BlockPos p, String n) { fp=p; name=n; }
-              public static void encode(SetKingdomNamePacket m, FriendlyByteBuf b) { b.writeBlockPos(m.fp); b.writeUtf(m.name, 64); }
-              public static SetKingdomNamePacket decode(FriendlyByteBuf b) { return new SetKingdomNamePacket(b.readBlockPos(), b.readUtf(64)); }
-              public static void handle(SetKingdomNamePacket m, Supplier<NetworkEvent.Context> ctx) {
-                  ctx.get().enqueueWork(() -> {
-                      ServerPlayer p = ctx.get().getSender(); if (p==null) return;
-                      KingdomData k = KingdomManager.getKingdomAt(p.level(), m.fp); if (k==null||!k.isOwner(p.getUUID())) return;
-                      k.setKingdomName(m.name); KingdomManager.get(p.level()).setDirty(); AKNetwork.sendToPlayer(p, new SyncKingdomDataPacket(k));
-                  });
-                  ctx.get().setPacketHandled(true);
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/client/ClientKingdomCache.java << 'ENDOFFILE'
-          package com.ancientkingdoms.client;
-          import com.ancientkingdoms.kingdom.KingdomData;
-          import javax.annotation.Nullable;
-          public class ClientKingdomCache {
-              @Nullable private static KingdomData current;
-              public static void setCurrent(KingdomData d) { current = d; }
-              @Nullable public static KingdomData getCurrent() { return current; }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/gui/ClientGuiHelper.java << 'ENDOFFILE'
-          package com.ancientkingdoms.gui;
-          import net.minecraft.client.Minecraft;
-          import net.minecraft.core.BlockPos;
-          public class ClientGuiHelper {
-              public static void openKingdomMenu(BlockPos fp) { Minecraft.getInstance().setScreen(new KingdomScreen(fp)); }
-              public static void openBlueprintMenu() { Minecraft.getInstance().setScreen(new BlueprintScreen()); }
-              public static void openWorldMap() { Minecraft.getInstance().setScreen(new WorldMapScreen()); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/gui/KingdomScreen.java << 'ENDOFFILE'
-          package com.ancientkingdoms.gui;
-          import com.ancientkingdoms.client.ClientKingdomCache;
-          import com.ancientkingdoms.kingdom.KingdomData;
-          import com.ancientkingdoms.network.AKNetwork;
-          import com.ancientkingdoms.network.packets.KingdomUpgradePacket;
-          import com.ancientkingdoms.network.packets.SetKingdomNamePacket;
-          import net.minecraft.client.gui.GuiGraphics;
-          import net.minecraft.client.gui.components.Button;
-          import net.minecraft.client.gui.components.EditBox;
-          import net.minecraft.client.gui.screens.Screen;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.chat.Component;
-          import java.util.List;
-          public class KingdomScreen extends Screen {
-              private final BlockPos flagPos;
-              private EditBox nameField;
-              public KingdomScreen(BlockPos fp) { super(Component.literal("Kingdom Management")); flagPos=fp; }
-              @Override protected void init() {
-                  super.init();
-                  nameField = new EditBox(font, width/2-100, 30, 200, 20, Component.literal("Name"));
-                  KingdomData kd = ClientKingdomCache.getCurrent();
-                  if (kd != null) nameField.setValue(kd.getKingdomName());
-                  addRenderableWidget(nameField);
-                  addRenderableWidget(Button.builder(Component.literal("Set Name"), b -> AKNetwork.sendToServer(new SetKingdomNamePacket(flagPos, nameField.getValue()))).bounds(width/2+105,30,60,20).build());
-                  if (kd != null) {
-                      List<KingdomData.BuildingSlot> bl = kd.getBuildings();
-                      for (int i=0; i<bl.size(); i++) { final int idx=i; KingdomData.BuildingSlot b=bl.get(i); addRenderableWidget(Button.builder(Component.literal("Upgrade ["+b.xpCost+" XP]"), btn -> AKNetwork.sendToServer(new KingdomUpgradePacket(flagPos, idx))).bounds(width/2+30, 70+i*22, 130, 18).build()); }
-                  }
-                  addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose()).bounds(width/2-40, height-30, 80, 20).build());
-              }
-              @Override public void render(GuiGraphics g, int mx, int my, float pt) {
-                  renderBackground(g, mx, my, pt);
-                  KingdomData kd = ClientKingdomCache.getCurrent();
-                  if (kd == null) { g.drawCenteredString(font, "No data!", width/2, height/2, 0xFFFFFF); super.render(g,mx,my,pt); return; }
-                  g.drawCenteredString(font, kd.getKingdomName(), width/2, 10, 0xFFD700);
-                  g.drawCenteredString(font, "Owner: "+kd.getOwnerName()+"  Level: "+kd.getLevel(), width/2, 56, 0xFFFFFF);
-                  int bw=200, bx=width/2-100, by=60, need=kd.xpForNextLevel(), fill=(int)(bw*((float)kd.getXp()/need));
-                  g.fill(bx,by,bx+bw,by+6,0xFF333333); g.fill(bx,by,bx+fill,by+6,0xFF55FF55);
-                  g.drawString(font, "XP: "+kd.getXp()+"/"+need, bx, by+8, 0xAAAAAA);
-                  List<KingdomData.BuildingSlot> bl = kd.getBuildings();
-                  for (int i=0; i<bl.size(); i++) { KingdomData.BuildingSlot b=bl.get(i); g.drawString(font, b.name+" Lv."+b.currentLevel, width/2-160, 74+i*22, 0xFFFFFF); }
-                  int wy = 70+bl.size()*22+10; g.drawString(font, "Workers:", width/2-160, wy, 0xFFD700);
-                  List<KingdomData.NpcWorker> wl = kd.getWorkers();
-                  for (int i=0; i<wl.size(); i++) { KingdomData.NpcWorker w=wl.get(i); g.drawString(font, w.displayName+" "+(w.isBusy()?"Busy "+w.secondsLeft()+"s":"Idle"), width/2-160, wy+12+i*12, 0xFFFFFF); }
-                  super.render(g, mx, my, pt);
-              }
-              @Override public boolean isPauseScreen() { return false; }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/gui/BlueprintScreen.java << 'ENDOFFILE'
-          package com.ancientkingdoms.gui;
-          import com.ancientkingdoms.blueprint.*;
-          import com.ancientkingdoms.network.AKNetwork;
-          import com.ancientkingdoms.network.packets.PlaceBlueprintPacket;
-          import net.minecraft.client.Minecraft;
-          import net.minecraft.client.gui.GuiGraphics;
-          import net.minecraft.client.gui.components.Button;
-          import net.minecraft.client.gui.screens.Screen;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.resources.ResourceLocation;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.Item;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraftforge.registries.ForgeRegistries;
-          import java.util.Map;
-          public class BlueprintScreen extends Screen {
-              private int cur = 0;
-              private Button prevBtn, nextBtn;
-              public BlueprintScreen() { super(Component.literal("Blueprint Scroll")); }
-              @Override protected void init() {
-                  super.init();
-                  prevBtn = addRenderableWidget(Button.builder(Component.literal("<"), b -> { cur=(cur-1+BlueprintRegistry.size())%BlueprintRegistry.size(); }).bounds(width/2-130,height/2-10,30,20).build());
-                  nextBtn = addRenderableWidget(Button.builder(Component.literal(">"), b -> { cur=(cur+1)%BlueprintRegistry.size(); }).bounds(width/2+100,height/2-10,30,20).build());
-                  addRenderableWidget(Button.builder(Component.literal("Place (ENTER)"), b -> tryPlace()).bounds(width/2-60,height-40,120,20).build());
-                  addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose()).bounds(width/2-30,height-18,60,16).build());
-              }
-              @Override public boolean keyPressed(int key, int sc, int mod) {
-                  if (key==263) { prevBtn.onPress(); return true; }
-                  if (key==262) { nextBtn.onPress(); return true; }
-                  if (key==257||key==335) { tryPlace(); return true; }
-                  return super.keyPressed(key, sc, mod);
-              }
-              private void tryPlace() {
-                  Player pl = Minecraft.getInstance().player; if (pl==null) return;
-                  AKNetwork.sendToServer(new PlaceBlueprintPacket(cur, pl.blockPosition().relative(pl.getDirection()))); onClose();
-              }
-              @Override public void render(GuiGraphics g, int mx, int my, float pt) {
-                  renderBackground(g, mx, my, pt);
-                  BlueprintDefinition bp = BlueprintRegistry.get(cur);
-                  Player pl = Minecraft.getInstance().player;
-                  int px=width/2-120, py=20;
-                  g.fill(px,py,px+240,py+height-50,0xCC1A1A1A); g.fill(px,py,px+240,py+2,0xFFFFD700);
-                  g.drawCenteredString(font, bp.getDisplayName(), width/2, py+8, 0xFFFFFF);
-                  g.drawCenteredString(font, (cur+1)+" / "+BlueprintRegistry.size(), width/2, py+18, 0x888888);
-                  g.drawString(font, bp.getDescription(), px+8, py+32, 0xCCCCCC);
-                  g.drawString(font, "Size: "+bp.getDimensions(), px+8, py+44, 0xFFFFFF);
-                  g.drawString(font, "Required:", px+8, py+58, 0xFFD700);
-                  int ry = py+70;
-                  for (Map.Entry<ResourceLocation,Integer> req : bp.getRequirements().entrySet()) {
-                      Item item = ForgeRegistries.ITEMS.getValue(req.getKey()); int need=req.getValue();
-                      boolean has=false; if (pl!=null&&item!=null) { int h=0; for (ItemStack s:pl.getInventory().items) if(s.getItem()==item) h+=s.getCount(); has=h>=need; }
-                      String nm = item!=null ? item.getDescription().getString() : req.getKey().getPath();
-                      g.drawString(font, (has?"§a":"§c")+nm+" x"+need, px+12, ry, 0xFFFFFF); ry+=11;
-                  }
-                  super.render(g, mx, my, pt);
-              }
-              @Override public boolean isPauseScreen() { return false; }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/gui/WorldMapScreen.java << 'ENDOFFILE'
-          package com.ancientkingdoms.gui;
-          import com.ancientkingdoms.client.ClientKingdomCache;
-          import com.ancientkingdoms.kingdom.KingdomData;
-          import net.minecraft.client.Minecraft;
-          import net.minecraft.client.gui.GuiGraphics;
-          import net.minecraft.client.gui.components.Button;
-          import net.minecraft.client.gui.screens.Screen;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.world.entity.player.Player;
-          import java.util.*;
-          public class WorldMapScreen extends Screen {
-              private static final float SC=0.15f;
-              private static final int MW=320, MH=200;
-              public WorldMapScreen() { super(Component.literal("World Map")); }
-              @Override protected void init() { addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose()).bounds(width/2+MW/2-50,height/2+MH/2+4,50,16).build()); }
-              @Override public void render(GuiGraphics g, int mx, int my, float pt) {
-                  renderBackground(g, mx, my, pt);
-                  int ox=(width-MW)/2, oy=(height-MH)/2;
-                  g.fill(ox,oy,ox+MW,oy+MH,0xFFF5DEB3);
-                  g.fill(ox,oy,ox+MW,oy+2,0xFF8B4513); g.fill(ox,oy+MH-2,ox+MW,oy+MH,0xFF8B4513);
-                  g.fill(ox,oy,ox+2,oy+MH,0xFF8B4513); g.fill(ox+MW-2,oy,ox+MW,oy+MH,0xFF8B4513);
-                  g.drawCenteredString(font, "WORLD MAP", width/2, oy+5, 0x8B0000);
-                  Minecraft mc = Minecraft.getInstance(); Player pl = mc.player;
-                  if (pl == null) { super.render(g,mx,my,pt); return; }
-                  double cx=pl.getX(), cz=pl.getZ(); int mcx=ox+MW/2, mcy=oy+MH/2;
-                  KingdomData own = ClientKingdomCache.getCurrent();
-                  List<KingdomData> kl = new ArrayList<>(); if (own!=null) kl.add(own);
-                  for (KingdomData k : kl) {
-                      BlockPos fp = k.getFlagPos();
-                      int sx=mcx+(int)((fp.getX()-cx)*SC), sy=mcy+(int)((fp.getZ()-cz)*SC);
-                      int r=(int)(KingdomData.TERRITORY_RADIUS*SC);
-                      for (int dy=-r;dy<=r;dy++){int dx=(int)Math.sqrt(r*r-dy*dy);g.fill(sx-dx,sy+dy,sx+dx+1,sy+dy+1,0x4400CC00);}
-                      g.drawString(font, "*", sx-3, sy-4, 0xFFD700);
-                      String nl=k.getKingdomName(); g.drawString(font, nl, sx-font.width(nl)/2, sy-r-10, 0x8B0000);
-                  }
-                  g.fill(mcx-2,mcy-2,mcx+2,mcy+2,0xFFFFFFFF);
-                  if (own!=null&&own.isOwner(pl.getUUID())) g.drawString(font,"[KING]",mcx-12,mcy-14,0xFFD700);
-                  super.render(g, mx, my, pt);
-              }
-              @Override public boolean isPauseScreen() { return false; }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/biome/AKBiomes.java << 'ENDOFFILE'
-          package com.ancientkingdoms.biome;
-          import com.ancientkingdoms.AncientKingdoms;
-          import net.minecraft.core.registries.Registries;
-          import net.minecraft.data.worldgen.BiomeDefaultFeatures;
-          import net.minecraft.world.level.biome.*;
-          import net.minecraftforge.registries.DeferredRegister;
-          import net.minecraftforge.registries.RegistryObject;
-          public class AKBiomes {
-              public static final DeferredRegister<Biome> BIOMES = DeferredRegister.create(Registries.BIOME, AncientKingdoms.MOD_ID);
-              public static final RegistryObject<Biome> ANCIENT_RUINS = BIOMES.register("ancient_ruins", AKBiomes::makeAncientRuins);
-              public static final RegistryObject<Biome> MEDIEVAL_FOREST = BIOMES.register("medieval_forest", AKBiomes::makeMedievalForest);
-              public static final RegistryObject<Biome> GOLDEN_SAVANNAH = BIOMES.register("golden_savannah", AKBiomes::makeGoldenSavannah);
-              public static final RegistryObject<Biome> CRIMSON_STEPPE = BIOMES.register("crimson_steppe", AKBiomes::makeCrimsonSteppe);
-              private static Biome makeAncientRuins() {
-                  BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder(null, null);
-                  BiomeDefaultFeatures.addDefaultCarversAndLakes(gen);
-                  MobSpawnSettings.Builder mob = new MobSpawnSettings.Builder(); BiomeDefaultFeatures.commonSpawns(mob);
-                  return new Biome.BiomeBuilder().hasPrecipitation(false).temperature(0.9f).downfall(0.1f)
-                      .specialEffects(new BiomeSpecialEffects.Builder().waterColor(0x3F76E4).waterFogColor(0x050533).fogColor(0xC0D8FF).skyColor(0x77ADFF).grassColorOverride(0xBFAA6A).foliageColorOverride(0xBFAA6A).ambientMoodSound(AmbientMoodSettings.LEGACY_CAVE_SETTINGS).build())
-                      .mobSpawnSettings(mob.build()).generationSettings(gen.build()).build();
-              }
-              private static Biome makeMedievalForest() {
-                  BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder(null, null);
-                  BiomeDefaultFeatures.addDefaultCarversAndLakes(gen); BiomeDefaultFeatures.addForestTrees(gen);
-                  MobSpawnSettings.Builder mob = new MobSpawnSettings.Builder(); BiomeDefaultFeatures.farmAnimals(mob); BiomeDefaultFeatures.commonSpawns(mob);
-                  return new Biome.BiomeBuilder().hasPrecipitation(true).temperature(0.6f).downfall(0.6f)
-                      .specialEffects(new BiomeSpecialEffects.Builder().waterColor(0x3F76E4).waterFogColor(0x050533).fogColor(0xC0D8FF).skyColor(0x77ADFF).grassColorOverride(0x3A7D1E).foliageColorOverride(0x2D6B14).ambientMoodSound(AmbientMoodSettings.LEGACY_CAVE_SETTINGS).build())
-                      .mobSpawnSettings(mob.build()).generationSettings(gen.build()).build();
-              }
-              private static Biome makeGoldenSavannah() {
-                  BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder(null, null);
-                  BiomeDefaultFeatures.addDefaultCarversAndLakes(gen);
-                  MobSpawnSettings.Builder mob = new MobSpawnSettings.Builder(); BiomeDefaultFeatures.commonSpawns(mob);
-                  return new Biome.BiomeBuilder().hasPrecipitation(false).temperature(1.2f).downfall(0.1f)
-                      .specialEffects(new BiomeSpecialEffects.Builder().waterColor(0x3F76E4).waterFogColor(0x050533).fogColor(0xFFD28F).skyColor(0xFFBB44).grassColorOverride(0xE2C44A).foliageColorOverride(0xCAAA30).ambientMoodSound(AmbientMoodSettings.LEGACY_CAVE_SETTINGS).build())
-                      .mobSpawnSettings(mob.build()).generationSettings(gen.build()).build();
-              }
-              private static Biome makeCrimsonSteppe() {
-                  BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder(null, null);
-                  BiomeDefaultFeatures.addDefaultCarversAndLakes(gen);
-                  MobSpawnSettings.Builder mob = new MobSpawnSettings.Builder(); BiomeDefaultFeatures.commonSpawns(mob);
-                  return new Biome.BiomeBuilder().hasPrecipitation(false).temperature(1.5f).downfall(0.05f)
-                      .specialEffects(new BiomeSpecialEffects.Builder().waterColor(0x3F76E4).waterFogColor(0x050533).fogColor(0xFF8888).skyColor(0xFF6666).grassColorOverride(0x8B1A1A).foliageColorOverride(0x6B1010).ambientMoodSound(AmbientMoodSettings.LEGACY_CAVE_SETTINGS).build())
-                      .mobSpawnSettings(mob.build()).generationSettings(gen.build()).build();
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/entity/AKEntities.java << 'ENDOFFILE'
-          package com.ancientkingdoms.entity;
-          import com.ancientkingdoms.AncientKingdoms;
-          import net.minecraft.world.entity.EntityType;
-          import net.minecraft.world.entity.MobCategory;
-          import net.minecraftforge.registries.DeferredRegister;
-          import net.minecraftforge.registries.ForgeRegistries;
-          import net.minecraftforge.registries.RegistryObject;
-          public class AKEntities {
-              public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, AncientKingdoms.MOD_ID);
-              public static final RegistryObject<EntityType<WorkerNpcEntity>> WORKER_NPC = ENTITY_TYPES.register("worker_npc",
-                  () -> EntityType.Builder.<WorkerNpcEntity>of(WorkerNpcEntity::new, MobCategory.MISC).sized(0.6f,1.95f).build("worker_npc"));
-              public static final RegistryObject<EntityType<KnightEntity>> KNIGHT = ENTITY_TYPES.register("knight",
-                  () -> EntityType.Builder.<KnightEntity>of(KnightEntity::new, MobCategory.MONSTER).sized(0.6f,1.95f).build("knight"));
-              public static final RegistryObject<EntityType<BanditEntity>> BANDIT = ENTITY_TYPES.register("bandit",
-                  () -> EntityType.Builder.<BanditEntity>of(BanditEntity::new, MobCategory.MONSTER).sized(0.6f,1.95f).build("bandit"));
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/entity/WorkerNpcEntity.java << 'ENDOFFILE'
-          package com.ancientkingdoms.entity;
-          import com.ancientkingdoms.kingdom.*;
-          import net.minecraft.core.BlockPos;
-          import net.minecraft.nbt.CompoundTag;
-          import net.minecraft.network.chat.Component;
-          import net.minecraft.world.InteractionHand;
-          import net.minecraft.world.InteractionResult;
-          import net.minecraft.world.entity.*;
-          import net.minecraft.world.entity.ai.attributes.*;
-          import net.minecraft.world.entity.ai.goal.*;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.*;
-          import net.minecraft.world.level.Level;
-          import java.util.UUID;
-          public class WorkerNpcEntity extends PathfinderMob {
-              private BlockPos kingdomFlagPos = null;
-              private UUID workerId = UUID.randomUUID();
-              private String workerName = "Worker";
-              public WorkerNpcEntity(EntityType<? extends WorkerNpcEntity> type, Level level) { super(type, level); }
-              public static AttributeSupplier.Builder createAttributes() {
-                  return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH,20.0).add(Attributes.MOVEMENT_SPEED,0.25);
-              }
-              @Override protected void registerGoals() {
-                  goalSelector.addGoal(1, new LookAtPlayerGoal(this, Player.class, 8f));
-                  goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 0.6));
-                  goalSelector.addGoal(3, new RandomLookAroundGoal(this));
-              }
-              @Override public InteractionResult mobInteract(Player player, InteractionHand hand) {
-                  if (!level().isClientSide && kingdomFlagPos != null) {
-                      KingdomData k = KingdomManager.getKingdomAt(level(), kingdomFlagPos);
-                      if (k != null) for (KingdomData.NpcWorker w : k.getWorkers()) if (w.workerId.equals(workerId)) {
-                          if (w.isBusy()) player.sendSystemMessage(Component.literal(workerName+": Busy "+w.secondsLeft()+"s left."));
-                          else if (!w.currentTask.isEmpty()) deliverRewards(player, w);
-                          else player.sendSystemMessage(Component.literal(workerName+": Idle. Assign me a task!"));
-                          return InteractionResult.SUCCESS;
-                      }
-                  }
-                  return super.mobInteract(player, hand);
-              }
-              private void deliverRewards(Player player, KingdomData.NpcWorker w) {
-                  String t = w.currentTask.toLowerCase(); ItemStack rw;
-                  if (t.contains("wood")||t.contains("tree")) rw = new ItemStack(Items.OAK_LOG, 16+random.nextInt(16));
-                  else if (t.contains("stone")||t.contains("mine")) rw = new ItemStack(Items.COBBLESTONE, 20+random.nextInt(20));
-                  else if (t.contains("food")||t.contains("farm")) rw = new ItemStack(Items.BREAD, 8+random.nextInt(8));
-                  else rw = new ItemStack(Items.GOLD_NUGGET, 5+random.nextInt(5));
-                  player.addItem(rw); player.sendSystemMessage(Component.literal(workerName+": Done!"));
-                  w.currentTask = ""; w.taskFinishTime = 0; KingdomManager.get(level()).setDirty();
-              }
-              @Override public void addAdditionalSaveData(CompoundTag t) {
-                  super.addAdditionalSaveData(t);
-                  if (kingdomFlagPos != null) { t.putInt("FlagX",kingdomFlagPos.getX()); t.putInt("FlagY",kingdomFlagPos.getY()); t.putInt("FlagZ",kingdomFlagPos.getZ()); }
-                  t.putUUID("WorkerId", workerId); t.putString("WorkerName", workerName);
-              }
-              @Override public void readAdditionalSaveData(CompoundTag t) {
-                  super.readAdditionalSaveData(t);
-                  if (t.contains("FlagX")) kingdomFlagPos = new BlockPos(t.getInt("FlagX"),t.getInt("FlagY"),t.getInt("FlagZ"));
-                  if (t.contains("WorkerId")) workerId = t.getUUID("WorkerId");
-                  if (t.contains("WorkerName")) workerName = t.getString("WorkerName");
-              }
-              @Override public Component getDisplayName() { return Component.literal(workerName); }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/entity/KnightEntity.java << 'ENDOFFILE'
-          package com.ancientkingdoms.entity;
-          import com.ancientkingdoms.item.AKItems;
-          import net.minecraft.world.entity.*;
-          import net.minecraft.world.entity.ai.attributes.*;
-          import net.minecraft.world.entity.ai.goal.*;
-          import net.minecraft.world.entity.ai.goal.target.*;
-          import net.minecraft.world.entity.monster.Monster;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraft.world.level.Level;
-          public class KnightEntity extends Monster {
-              public KnightEntity(EntityType<? extends KnightEntity> type, Level level) { super(type, level); }
-              public static AttributeSupplier.Builder createAttributes() {
-                  return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH,40.0).add(Attributes.ATTACK_DAMAGE,8.0).add(Attributes.MOVEMENT_SPEED,0.28).add(Attributes.ARMOR,8.0);
-              }
-              @Override protected void registerGoals() {
-                  goalSelector.addGoal(1, new MeleeAttackGoal(this,1.0,true)); goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this,0.8));
-                  goalSelector.addGoal(3, new LookAtPlayerGoal(this,Player.class,8f)); goalSelector.addGoal(4, new RandomLookAroundGoal(this));
-                  targetSelector.addGoal(1, new HurtByTargetGoal(this)); targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this,Player.class,true));
-              }
-              @Override protected void populateDefaultEquipmentSlots(net.minecraft.util.RandomSource r, net.minecraft.world.level.ServerLevelAccessor l) {
-                  setItemSlot(EquipmentSlot.HEAD, new ItemStack(AKItems.KNIGHT_HELMET.get()));
-                  setItemSlot(EquipmentSlot.CHEST, new ItemStack(AKItems.KNIGHT_CHESTPLATE.get()));
-                  setItemSlot(EquipmentSlot.LEGS, new ItemStack(AKItems.KNIGHT_LEGGINGS.get()));
-                  setItemSlot(EquipmentSlot.FEET, new ItemStack(AKItems.KNIGHT_BOOTS.get()));
-                  setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(AKItems.KNIGHT_SWORD.get()));
-              }
-          }
-          ENDOFFILE
-
-          cat > src/main/java/com/ancientkingdoms/entity/BanditEntity.java << 'ENDOFFILE'
-          package com.ancientkingdoms.entity;
-          import com.ancientkingdoms.item.AKItems;
-          import net.minecraft.world.entity.*;
-          import net.minecraft.world.entity.ai.attributes.*;
-          import net.minecraft.world.entity.ai.goal.*;
-          import net.minecraft.world.entity.ai.goal.target.*;
-          import net.minecraft.world.entity.monster.Monster;
-          import net.minecraft.world.entity.player.Player;
-          import net.minecraft.world.item.ItemStack;
-          import net.minecraft.world.level.Level;
-          public class BanditEntity extends Monster {
-              public BanditEntity(EntityType<? extends BanditEntity> type, Level level) { super(type, level); }
-              public static AttributeSupplier.Builder createAttributes() {
-                  return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH,24.0).add(Attributes.ATTACK_DAMAGE,5.0).add(Attributes.MOVEMENT_SPEED,0.32);
-              }
-              @Override protected void registerGoals() {
-                  goalSelector.addGoal(1, new MeleeAttackGoal(this,1.1,true)); goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this,0.8));
-                  goalSelector.addGoal(3, new LookAtPlayerGoal(this,Player.class,8f)); goalSelector.addGoal(4, new RandomLookAroundGoal(this));
-                  targetSelector.addGoal(1, new HurtByTargetGoal(this)); targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this,Player.class,true));
-              }
-              @Override protected void populateDefaultEquipmentSlots(net.minecraft.util.RandomSource r, net.minecraft.world.level.ServerLevelAccessor l) {
-                  setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(AKItems.BRONZE_SWORD.get()));
-                  setItemSlot(EquipmentSlot.HEAD, new ItemStack(AKItems.BRONZE_HELMET.get()));
-              }
-          }
-          ENDOFFILE
-
-          # Lang
-          printf '{"block.ancientkingdoms.ancient_stone":"Ancient Stone","block.ancientkingdoms.ancient_stone_bricks":"Ancient Stone Bricks","block.ancientkingdoms.ancient_stone_pillar":"Ancient Stone Pillar","block.ancientkingdoms.cracked_ancient_stone":"Cracked Ancient Stone","block.ancientkingdoms.rune_stone":"Rune Stone","block.ancientkingdoms.mossy_ancient_stone":"Mossy Ancient Stone","block.ancientkingdoms.throne_block":"Throne Block","block.ancientkingdoms.sandstone_brick":"Sandstone Brick","block.ancientkingdoms.marble_block":"Marble Block","block.ancientkingdoms.marble_bricks":"Marble Bricks","block.ancientkingdoms.kingdom_flag":"Kingdom Flag","item.ancientkingdoms.bronze_ingot":"Bronze Ingot","item.ancientkingdoms.iron_chain_link":"Iron Chain Link","item.ancientkingdoms.ancient_coin":"Ancient Coin","item.ancientkingdoms.kingdom_emblem":"Kingdom Emblem","item.ancientkingdoms.bronze_helmet":"Bronze Helmet","item.ancientkingdoms.bronze_chestplate":"Bronze Chestplate","item.ancientkingdoms.bronze_leggings":"Bronze Leggings","item.ancientkingdoms.bronze_boots":"Bronze Boots","item.ancientkingdoms.knight_helmet":"Knight Helmet","item.ancientkingdoms.knight_chestplate":"Knight Chestplate","item.ancientkingdoms.knight_leggings":"Knight Leggings","item.ancientkingdoms.knight_boots":"Knight Boots","item.ancientkingdoms.bronze_sword":"Bronze Sword","item.ancientkingdoms.knight_sword":"Knight Sword","item.ancientkingdoms.spear":"Spear","item.ancientkingdoms.war_axe":"War Axe","item.ancientkingdoms.crossbow_ancient":"Ancient Crossbow","item.ancientkingdoms.blueprint_scroll":"Blueprint Scroll","item.ancientkingdoms.world_map":"World Map","item.ancientkingdoms.quest_scroll":"Quest Scroll","entity.ancientkingdoms.worker_npc":"Worker","entity.ancientkingdoms.knight":"Knight","entity.ancientkingdoms.bandit":"Bandit","biome.ancientkingdoms.ancient_ruins":"Ancient Ruins","biome.ancientkingdoms.medieval_forest":"Medieval Forest","biome.ancientkingdoms.golden_savannah":"Golden Savannah","biome.ancientkingdoms.crimson_steppe":"Crimson Steppe"}' > src/main/resources/assets/ancientkingdoms/lang/en_us.json
-          printf '{"block.ancientkingdoms.ancient_stone":"Древний Камень","block.ancientkingdoms.kingdom_flag":"Флаг Королевства","item.ancientkingdoms.bronze_ingot":"Бронзовый Слиток","item.ancientkingdoms.iron_chain_link":"Звено Цепи","item.ancientkingdoms.ancient_coin":"Древняя Монета","item.ancientkingdoms.kingdom_emblem":"Эмблема Королевства","item.ancientkingdoms.blueprint_scroll":"Свиток Чертежей","item.ancientkingdoms.world_map":"Карта Мира","entity.ancientkingdoms.worker_npc":"Рабочий","entity.ancientkingdoms.knight":"Рыцарь","entity.ancientkingdoms.bandit":"Бандит"}' > src/main/resources/assets/ancientkingdoms/lang/ru_ru.json
-
-          # Blockstates + Models
-          for block in ancient_stone ancient_stone_bricks ancient_stone_pillar cracked_ancient_stone rune_stone mossy_ancient_stone throne_block sandstone_brick marble_block marble_bricks; do
-            printf '{"variants":{"":{"model":"ancientkingdoms:block/%s"}}}' "$block" > "src/main/resources/assets/ancientkingdoms/blockstates/${block}.json"
-            printf '{"parent":"minecraft:block/cube_all","textures":{"all":"ancientkingdoms:block/%s"}}' "$block" > "src/main/resources/assets/ancientkingdoms/models/block/${block}.json"
-            printf '{"parent":"ancientkingdoms:block/%s"}' "$block" > "src/main/resources/assets/ancientkingdoms/models/item/${block}.json"
-          done
-          printf '{"variants":{"upper=false":{"model":"ancientkingdoms:block/kingdom_flag"},"upper=true":{"model":"ancientkingdoms:block/kingdom_flag"}}}' > src/main/resources/assets/ancientkingdoms/blockstates/kingdom_flag.json
-          printf '{"parent":"minecraft:block/cube_all","textures":{"all":"ancientkingdoms:block/kingdom_flag"}}' > src/main/resources/assets/ancientkingdoms/models/block/kingdom_flag.json
-          printf '{"parent":"ancientkingdoms:block/kingdom_flag"}' > src/main/resources/assets/ancientkingdoms/models/item/kingdom_flag.json
-          for item in bronze_ingot iron_chain_link ancient_coin kingdom_emblem bronze_helmet bronze_chestplate bronze_leggings bronze_boots knight_helmet knight_chestplate knight_leggings knight_boots bronze_sword knight_sword spear war_axe crossbow_ancient blueprint_scroll world_map quest_scroll; do
-            printf '{"parent":"minecraft:item/handheld","textures":{"layer0":"ancientkingdoms:item/%s"}}' "$item" > "src/main/resources/assets/ancientkingdoms/models/item/${item}.json"
-          done
-
-          # Loot tables
-          for block in ancient_stone ancient_stone_bricks ancient_stone_pillar cracked_ancient_stone rune_stone mossy_ancient_stone throne_block sandstone_brick marble_block marble_bricks kingdom_flag; do
-            printf '{"type":"minecraft:block","pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"ancientkingdoms:%s"}],"conditions":[{"condition":"minecraft:survives_explosion"}]}]}' "$block" > "src/main/resources/data/ancientkingdoms/loot_tables/blocks/${block}.json"
-          done
-
-          # Recipes
-          printf '{"type":"minecraft:crafting_shaped","pattern":["GEG","IGI","SIS"],"key":{"G":{"item":"minecraft:gold_ingot"},"E":{"item":"ancientkingdoms:kingdom_emblem"},"I":{"item":"minecraft:iron_ingot"},"S":{"item":"ancientkingdoms:ancient_stone"}},"result":{"item":"ancientkingdoms:kingdom_flag","count":1}}' > src/main/resources/data/ancientkingdoms/recipes/kingdom_flag.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["GGG","GAG","GGG"],"key":{"G":{"item":"minecraft:gold_ingot"},"A":{"item":"ancientkingdoms:ancient_coin"}},"result":{"item":"ancientkingdoms:kingdom_emblem","count":1}}' > src/main/resources/data/ancientkingdoms/recipes/kingdom_emblem.json
-          printf '{"type":"minecraft:crafting_shapeless","ingredients":[{"item":"minecraft:gold_nugget"},{"item":"minecraft:gold_nugget"},{"item":"minecraft:gold_nugget"}],"result":{"item":"ancientkingdoms:ancient_coin","count":1}}' > src/main/resources/data/ancientkingdoms/recipes/ancient_coin.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["CI","IC"],"key":{"C":{"item":"minecraft:copper_ingot"},"I":{"item":"minecraft:iron_ingot"}},"result":{"item":"ancientkingdoms:bronze_ingot","count":2}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_ingot.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":[" I ","I I"," I "],"key":{"I":{"item":"minecraft:iron_ingot"}},"result":{"item":"ancientkingdoms:iron_chain_link","count":4}}' > src/main/resources/data/ancientkingdoms/recipes/iron_chain_link.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["BBB","B B"],"key":{"B":{"item":"ancientkingdoms:bronze_ingot"}},"result":{"item":"ancientkingdoms:bronze_helmet"}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_helmet.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["B B","BBB","BBB"],"key":{"B":{"item":"ancientkingdoms:bronze_ingot"}},"result":{"item":"ancientkingdoms:bronze_chestplate"}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_chestplate.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["BBB","B B","B B"],"key":{"B":{"item":"ancientkingdoms:bronze_ingot"}},"result":{"item":"ancientkingdoms:bronze_leggings"}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_leggings.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["B B","B B"],"key":{"B":{"item":"ancientkingdoms:bronze_ingot"}},"result":{"item":"ancientkingdoms:bronze_boots"}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_boots.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["CCC","C C"],"key":{"C":{"item":"ancientkingdoms:iron_chain_link"}},"result":{"item":"ancientkingdoms:knight_helmet"}}' > src/main/resources/data/ancientkingdoms/recipes/knight_helmet.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["C C","CCC","CCC"],"key":{"C":{"item":"ancientkingdoms:iron_chain_link"}},"result":{"item":"ancientkingdoms:knight_chestplate"}}' > src/main/resources/data/ancientkingdoms/recipes/knight_chestplate.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["CCC","C C","C C"],"key":{"C":{"item":"ancientkingdoms:iron_chain_link"}},"result":{"item":"ancientkingdoms:knight_leggings"}}' > src/main/resources/data/ancientkingdoms/recipes/knight_leggings.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["C C","C C"],"key":{"C":{"item":"ancientkingdoms:iron_chain_link"}},"result":{"item":"ancientkingdoms:knight_boots"}}' > src/main/resources/data/ancientkingdoms/recipes/knight_boots.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["B"," B"," S"],"key":{"B":{"item":"ancientkingdoms:bronze_ingot"},"S":{"item":"minecraft:stick"}},"result":{"item":"ancientkingdoms:bronze_sword"}}' > src/main/resources/data/ancientkingdoms/recipes/bronze_sword.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["C","C","S"],"key":{"C":{"item":"ancientkingdoms:iron_chain_link"},"S":{"item":"minecraft:blaze_rod"}},"result":{"item":"ancientkingdoms:knight_sword"}}' > src/main/resources/data/ancientkingdoms/recipes/knight_sword.json
-          printf '{"type":"minecraft:crafting_shapeless","ingredients":[{"item":"minecraft:stone"},{"item":"minecraft:gravel"}],"result":{"item":"ancientkingdoms:ancient_stone","count":2}}' > src/main/resources/data/ancientkingdoms/recipes/ancient_stone.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["AA","AA"],"key":{"A":{"item":"ancientkingdoms:ancient_stone"}},"result":{"item":"ancientkingdoms:ancient_stone_bricks","count":4}}' > src/main/resources/data/ancientkingdoms/recipes/ancient_stone_bricks.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["PAP","PEP","PAP"],"key":{"P":{"item":"minecraft:paper"},"A":{"item":"ancientkingdoms:ancient_coin"},"E":{"item":"ancientkingdoms:kingdom_emblem"}},"result":{"item":"ancientkingdoms:blueprint_scroll","count":1}}' > src/main/resources/data/ancientkingdoms/recipes/blueprint_scroll.json
-          printf '{"type":"minecraft:crafting_shaped","pattern":["GGG","GPG","GAG"],"key":{"G":{"item":"minecraft:gold_ingot"},"P":{"item":"minecraft:paper"},"A":{"item":"ancientkingdoms:ancient_coin"}},"result":{"item":"ancientkingdoms:world_map","count":1}}' > src/main/resources/data/ancientkingdoms/recipes/world_map.json
-
-          echo "=== ALL FILES CREATED SUCCESSFULLY ==="
-          echo "=== FORGE VERSION: 1.21.1-52.1.0 ==="
-          find src -name "*.java" | wc -l
-
-      - name: Download Gradle wrapper
-        run: |
-          mkdir -p gradle/wrapper
-          curl -fsSL -o gradle/wrapper/gradle-wrapper.jar \
-            "https://github.com/gradle/gradle/raw/v8.8.0/gradle/wrapper/gradle-wrapper.jar"
-          printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.8-bin.zip\nnetworkTimeout=10000\nvalidateDistributionUrl=true\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > gradle/wrapper/gradle-wrapper.properties
-          curl -fsSL -o gradlew "https://raw.githubusercontent.com/gradle/gradle/v8.8.0/gradlew"
-          chmod +x gradlew
-          echo "=== FORGE: 1.21.1-52.1.0 | ForgeGradle: 6.0.24 ==="
-
-      - name: Build JAR
-        run: ./gradlew build --no-daemon --stacktrace
-        env:
-          JAVA_OPTS: "-Xmx4G"
-
-      - name: Upload JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: ancientkingdoms-1.21.1-forge-52
-          path: |
-            build/libs/*.jar
-            !build/libs/*-sources.jar
-            !build/libs/*-dev.jar
-          if-no-files-found: warn
-
-      - name: Done
-        run: echo "=== Ancient Kingdoms 1.21.1 Forge 52.1.0 built! ==="
+  - name: Upload finished jar
+    uses: actions/upload-artifact@v4
+    with:
+      name: TolyanVisuals-1.21.4-Release
+      path: |
+        build/libs/*.jar
+        !build/libs/*-sources.jar
+        !build/libs/*-dev.jar
